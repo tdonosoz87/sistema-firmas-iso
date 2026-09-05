@@ -12,12 +12,14 @@ export function PdfSigner() {
   const [pdfFile, setPdfFile] = useState(null)
   const [numPages, setNumPages] = useState(null)
   const [pageNumber, setPageNumber] = useState(1)
-  const [signatureText, setSignatureText] = useState('')
   const [loading, setLoading] = useState(false)
   const [signedPdfUrl, setSignedPdfUrl] = useState('')
 
   const [coords, setCoords] = useState({ x: 20, y: 20 })
   const nodeRef = useRef(null)
+
+  // Obtener el identificador o nombre del usuario automáticamente
+  const nombreFirmante = profile?.email || user?.email || 'Usuario Autenticado'
 
   const handleFileChange = (e) => {
     if (e.target.files[0]) {
@@ -32,9 +34,9 @@ export function PdfSigner() {
     setCoords({ x: data.x, y: data.y })
   }
 
-const handleSignAndSave = async () => {
-    if (!pdfFile || !signatureText) {
-      alert('Por favor selecciona un PDF e ingresa la firma.')
+  const handleSignAndSave = async () => {
+    if (!pdfFile) {
+      alert('Por favor selecciona un archivo PDF.')
       return
     }
 
@@ -48,7 +50,6 @@ const handleSignAndSave = async () => {
       const { height } = currentPage.getSize()
 
       const pdfX = Math.max(10, coords.x)
-      // Ajuste de altura para que el texto quede SOBRE la línea elegida
       const pdfY = Math.max(10, height - coords.y + 5)
 
       const fechaActual = new Date().toLocaleString('es-CL', {
@@ -57,7 +58,7 @@ const handleSignAndSave = async () => {
       })
 
       const lineasTexto = [
-        `Firmado por: ${signatureText} (${profile?.email || user?.email})`,
+        `Firmado por: ${nombreFirmante}`,
         `Cargo: ${profile?.perfil || ''} ${profile?.subperfil_iso ? `[${profile.subperfil_iso}]` : ''}`,
         `Fecha: ${fechaActual}`
       ]
@@ -94,14 +95,9 @@ const handleSignAndSave = async () => {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '15px' }}>
         <input type="file" accept="application/pdf" onChange={handleFileChange} />
-        
-        <input 
-          type="text" 
-          placeholder="Nombre del Firmante" 
-          value={signatureText}
-          onChange={(e) => setSignatureText(e.target.value)}
-          style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
-        />
+        <p style={{ fontSize: '13px', margin: 0, color: '#333' }}>
+          <strong>Firmante activo:</strong> {nombreFirmante} ({profile?.perfil})
+        </p>
       </div>
 
       {pdfFile && (
@@ -134,7 +130,7 @@ const handleSignAndSave = async () => {
                   userSelect: 'none'
                 }}
               >
-                ✍️ {signatureText || 'Tu Firma Aquí'}
+                ✍️ {nombreFirmante}
               </div>
             </Draggable>
 
