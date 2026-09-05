@@ -32,7 +32,7 @@ export function PdfSigner() {
     setCoords({ x: data.x, y: data.y })
   }
 
-  const handleSignAndSave = async () => {
+const handleSignAndSave = async () => {
     if (!pdfFile || !signatureText) {
       alert('Por favor selecciona un PDF e ingresa la firma.')
       return
@@ -48,29 +48,24 @@ export function PdfSigner() {
       const { height } = currentPage.getSize()
 
       const pdfX = Math.max(10, coords.x)
-        // Código anterior:
-        // const pdfY = Math.max(10, height - coords.y - 30)
-        // Nuevo cálculo con elevación ajustada:
+      // Ajuste de altura para que el texto quede SOBRE la línea elegida
       const pdfY = Math.max(10, height - coords.y + 15)
 
-      // Obtener fecha y hora actual en formato local
       const fechaActual = new Date().toLocaleString('es-CL', {
         dateStyle: 'short',
         timeStyle: 'medium'
       })
 
-      // Arreglo con cada renglón individual
       const lineasTexto = [
         `Firmado por: ${signatureText} (${profile?.email || user?.email})`,
         `Cargo: ${profile?.perfil || ''} ${profile?.subperfil_iso ? `[${profile.subperfil_iso}]` : ''}`,
         `Fecha: ${fechaActual}`
       ]
 
-      // Estampar cada línea aplicando un desplazamiento vertical (offset)
       lineasTexto.forEach((linea, index) => {
         currentPage.drawText(linea, {
           x: pdfX,
-          y: pdfY - (index * 11), // Baja 11 pixeles por cada línea
+          y: pdfY - (index * 11),
           size: 8,
           color: rgb(0, 0.3, 0.8),
         })
@@ -79,7 +74,6 @@ export function PdfSigner() {
       const pdfBytes = await pdfDoc.save()
       const blob = new Blob([pdfBytes], { type: 'application/pdf' })
 
-      // Nombre único agregando timestamp para evitar caché
       const nombreUnico = `${Date.now()}_${pdfFile.name}`
       const publicUrl = await uploadSignedPdf(blob, nombreUnico, user.id)
       
