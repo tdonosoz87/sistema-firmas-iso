@@ -34,45 +34,48 @@ export function SignedDocumentsHistory({ reloadKey }) {
         <p style={{ fontSize: '13px', color: '#666', marginTop: '10px' }}>Aún no hay documentos finalizados con ambas firmas.</p>
       ) : (
         <ul style={{ listStyle: 'none', padding: 0, marginTop: '15px' }}>
-          {completados.map((doc) => (
-            <li 
-              key={doc.id} 
-              style={{
-                padding: '12px',
-                marginBottom: '10px',
-                backgroundColor: '#fff',
-                borderRadius: '6px',
-                border: '1px solid #bfe5ef',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center'
-              }}
-            >
-              <div>
-                <strong style={{ display: 'block', color: '#333' }}>📄 {doc.nombre_archivo}</strong>
-                <span style={{ fontSize: '12px', color: '#28a745', fontWeight: 'bold' }}>
-                  ✅ Estado: Completado (Firmado y Aprobado)
-                </span>
-              </div>
-              <a 
-                href={doc.url_pdf_final} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                style={{
-                  padding: '6px 12px',
-                  backgroundColor: '#0066cc',
-                  color: '#fff',
-                  borderRadius: '4px',
-                  textDecoration: 'none',
-                  fontSize: '12px',
-                  fontWeight: 'bold'
-                }}
-              >
-                Abrir PDF Final ↗
-              </a>
-            </li>
-          ))}
-        </ul>
+  {completados.map((doc) => (
+    <li 
+      key={doc.id} 
+      style={{
+        padding: '12px',
+        marginBottom: '10px',
+        backgroundColor: '#fff',
+        borderRadius: '6px',
+        border: '1px solid #bfe5ef',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+      }}
+    >
+      <div>
+        <strong style={{ display: 'block', color: '#333', fontSize: '14px' }}>📄 {doc.nombre_archivo}</strong>
+        <span style={{ fontSize: '12px', color: '#666', display: 'block', marginTop: '2px' }}>
+          Creado el: {new Date(doc.created_at).toLocaleString('es-CL')}
+        </span>
+        <span style={{ fontSize: '12px', color: '#28a745', fontWeight: 'bold' }}>
+          ✅ Estado: Completado (2/2 Firmas)
+        </span>
+      </div>
+      <a 
+        href={doc.url_pdf_final} 
+        target="_blank" 
+        rel="noopener noreferrer"
+        style={{
+          padding: '8px 14px',
+          backgroundColor: '#0066cc',
+          color: '#fff',
+          borderRadius: '4px',
+          textDecoration: 'none',
+          fontSize: '12px',
+          fontWeight: 'bold'
+        }}
+      >
+        Abrir PDF Final ↗
+      </a>
+    </li>
+  ))}
+</ul>
       )}
     </div>
   )
