@@ -2,7 +2,7 @@ import { useState, useRef } from 'react'
 import { Document, Page, pdfjs } from 'react-pdf'
 import Draggable from 'react-draggable'
 import { PDFDocument, rgb } from 'pdf-lib'
-import { uploadSignedPdf } from '../services/documentService'
+import { uploadSignedPdf, crearSolicitudFirma } from '../services/documentService'
 import { useAuth } from '../context/AuthContext'
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`
@@ -18,7 +18,6 @@ export function PdfSigner() {
   const [coords, setCoords] = useState({ x: 20, y: 20 })
   const nodeRef = useRef(null)
 
-  // Obtener el identificador o nombre del usuario automáticamente
   const nombreFirmante = profile?.email || user?.email || 'Usuario Autenticado'
 
   const handleFileChange = (e) => {
@@ -76,14 +75,24 @@ export function PdfSigner() {
       const blob = new Blob([pdfBytes], { type: 'application/pdf' })
 
       const nombreUnico = `${Date.now()}_${pdfFile.name}`
+      
+      // 1. Subir archivo a Storage
       const publicUrl = await uploadSignedPdf(blob, nombreUnico, user.id)
+
+      // 2. REGISTRAR EN LA TABLA "documentos" para que el Gerente lo pueda ver
+      await crearSolicitudFirma({
+        nombreArchivo: pdfFile.name,
+        urlParcial: publicUrl,
+        creadorId: user.id,
+        coordsFirma1: coords
+      })
       
       setSignedPdfUrl(publicUrl)
-      alert('¡Documento firmado y guardado con éxito!')
+      alert('¡Documento firmado y enviado a revisión de Gerencia / SGSI!')
 
     } catch (error) {
       console.error('Error al firmar PDF:', error)
-      alert('Error al procesar la firma en el archivo.')
+      alert('Error al procesar y guardar la firma.')
     } finally {
       setLoading(false)
     }
@@ -103,7 +112,7 @@ export function PdfSigner() {
       {pdfFile && (
         <div>
           <p style={{ fontSize: '13px', color: '#666' }}>
-            🖱️ **Arrastra el recuadro azul** hacia el lugar exacto del PDF donde deseas colocar la firma:
+            🖱️ **Arrastra el recuadro azul** hacia el lugar exacto del PDF donde deseas colocar la primera firma:
           </p>
 
           <div 
@@ -165,16 +174,16 @@ export function PdfSigner() {
               display: 'block'
             }}
           >
-            {loading ? 'Procesando y Guardando...' : 'Estampar Firma y Guardar'}
+            {loading ? 'Procesando y Guardando...' : 'Estampar Firma y Enviar a Validación'}
           </button>
         </div>
       )}
 
       {signedPdfUrl && (
         <div style={{ marginTop: '15px' }}>
-          <p style={{ color: '#28a745', fontWeight: 'bold' }}>¡Documento guardado con éxito!</p>
+          <p style={{ color: '#28a745', fontWeight: 'bold' }}>¡Documento guardado y enviado a la bandeja de pendientes!</p>
           <a href={signedPdfUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#0066cc' }}>
-            📄 Abrir Documento Firmado en Supabase Storage
+            📄 Abrir PDF Parcialmente Firmado
           </a>
         </div>
       )}
