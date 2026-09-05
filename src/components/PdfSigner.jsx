@@ -5,7 +5,6 @@ import { PDFDocument, rgb } from 'pdf-lib'
 import { uploadSignedPdf } from '../services/documentService'
 import { useAuth } from '../context/AuthContext'
 
-// Configurar el worker de PDF.js para React
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`
 
 export function PdfSigner() {
@@ -17,25 +16,25 @@ export function PdfSigner() {
   const [loading, setLoading] = useState(false)
   const [signedPdfUrl, setSignedPdfUrl] = useState('')
 
-  // Coordenadas relativas del cuadro arrastrable
-  const [coords, setCoords] = useState({ x: 50, y: 50 })
-  const containerRef = useRef(null)
+  const [coords, setCoords] = useState({ x: 20, y: 20 })
+  const nodeRef = useRef(null)
 
   const handleFileChange = (e) => {
     if (e.target.files[0]) {
       setPdfFile(e.target.files[0])
       setSignedPdfUrl('')
       setPageNumber(1)
+      setCoords({ x: 20, y: 20 })
     }
   }
 
-  const handleDrag = (e, data) => {
+  const handleStop = (e, data) => {
     setCoords({ x: data.x, y: data.y })
   }
 
   const handleSignAndSave = async () => {
     if (!pdfFile || !signatureText) {
-      alert('Selecciona un PDF e ingresa el texto de firma.')
+      alert('Por favor selecciona un PDF e ingresa la firma.')
       return
     }
 
@@ -44,15 +43,12 @@ export function PdfSigner() {
       const fileArrayBuffer = await pdfFile.arrayBuffer()
       const pdfDoc = await PDFDocument.load(fileArrayBuffer)
 
-      // Seleccionar la página actual indicada por el usuario
       const pages = pdfDoc.getPages()
       const currentPage = pages[pageNumber - 1]
-      const { width, height } = currentPage.getSize()
+      const { height } = currentPage.getSize()
 
-      // Convertir coordenadas del lienzo HTML al sistema de coordenadas de pdf-lib (origen en esquina inferior izquierda)
-      // Ajustamos escala y compensación vertical
-      const pdfX = Math.max(10, Math.min(coords.x, width - 200))
-      const pdfY = Math.max(10, height - coords.y - 40)
+      const pdfX = Math.max(10, coords.x)
+      const pdfY = Math.max(10, height - coords.y - 30)
 
       const signInfo = `Firmado por: ${signatureText} | Cargo: ${profile?.perfil} ${profile?.subperfil_iso ? `(${profile.subperfil_iso})` : ''}`
 
@@ -66,7 +62,6 @@ export function PdfSigner() {
       const pdfBytes = await pdfDoc.save()
       const blob = new Blob([pdfBytes], { type: 'application/pdf' })
 
-      // Subir a Supabase Storage
       const publicUrl = await uploadSignedPdf(blob, pdfFile.name, user.id)
       setSignedPdfUrl(publicUrl)
       alert('¡Documento firmado y guardado con éxito!')
@@ -101,36 +96,34 @@ export function PdfSigner() {
             🖱️ **Arrastra el recuadro azul** hacia el lugar exacto del PDF donde deseas colocar la firma:
           </p>
 
-          {/* Área del Lienzo de Previsualización */}
           <div 
-            ref={containerRef}
             style={{ 
               position: 'relative', 
               border: '2px dashed #bbb', 
               display: 'inline-block',
-              overflow: 'hidden',
               backgroundColor: '#f5f5f5'
             }}
           >
-            {/* Recuadro Arrastrable de Firma */}
-            <Draggable bounds="parent" onDrag={handleDrag} position={coords}>
-              <div style={{
-                position: 'absolute',
-                padding: '6px 10px',
-                backgroundColor: 'rgba(0, 102, 204, 0.85)',
-                color: '#fff',
-                borderRadius: '4px',
-                fontSize: '11px',
-                cursor: 'move',
-                zIndex: 10,
-                boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
-                userSelect: 'none'
-              }}>
+            <Draggable nodeRef={nodeRef} bounds="parent" onStop={handleStop} defaultPosition={{ x: 20, y: 20 }}>
+              <div 
+                ref={nodeRef}
+                style={{
+                  position: 'absolute',
+                  padding: '6px 10px',
+                  backgroundColor: '#0066cc',
+                  color: '#fff',
+                  borderRadius: '4px',
+                  fontSize: '11px',
+                  cursor: 'grab',
+                  zIndex: 999,
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+                  userSelect: 'none'
+                }}
+              >
                 ✍️ {signatureText || 'Tu Firma Aquí'}
               </div>
             </Draggable>
 
-            {/* Vista Previa del PDF */}
             <Document 
               file={pdfFile} 
               onLoadSuccess={({ numPages }) => setNumPages(numPages)}
@@ -139,7 +132,6 @@ export function PdfSigner() {
             </Document>
           </div>
 
-          {/* Paginación */}
           {numPages > 1 && (
             <div style={{ marginTop: '10px', display: 'flex', gap: '10px', alignItems: 'center' }}>
               <button disabled={pageNumber <= 1} onClick={() => setPageNumber(p => p - 1)}>Anterior</button>
