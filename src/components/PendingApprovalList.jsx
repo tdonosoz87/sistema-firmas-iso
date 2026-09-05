@@ -7,7 +7,7 @@ import { useAuth } from '../context/AuthContext'
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`
 
-export function PendingApprovalList() {
+export function PendingApprovalList({ onApproved }) {
   const { user, profile } = useAuth()
   const [pendientes, setPendientes] = useState([])
   const [selectedDoc, setSelectedDoc] = useState(null)
@@ -88,7 +88,12 @@ export function PendingApprovalList() {
 
       alert('¡Documento aprobado y firmado exitosamente!')
       setSelectedDoc(null)
-      cargarPendientes()
+      await cargarPendientes()
+
+      // Notificar al Dashboard para recargar la lista de completados
+      if (onApproved) {
+        onApproved()
+      }
     } catch (error) {
       console.error('Error al aprobar documento:', error)
       alert('Ocurrió un error al procesar la aprobación.')
@@ -107,6 +112,7 @@ export function PendingApprovalList() {
         <div>
           <label style={{ fontSize: '13px', fontWeight: 'bold' }}>Selecciona un documento para dar Visto Bueno (OK):</label>
           <select 
+            value={selectedDoc?.id || ''}
             onChange={(e) => {
               const doc = pendientes.find(d => d.id === e.target.value)
               setSelectedDoc(doc || null)

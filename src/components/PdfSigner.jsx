@@ -7,7 +7,7 @@ import { useAuth } from '../context/AuthContext'
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`
 
-export function PdfSigner() {
+export function PdfSigner({ onSigned }) {
   const { user, profile } = useAuth()
   const [pdfFile, setPdfFile] = useState(null)
   const [numPages, setNumPages] = useState(null)
@@ -79,7 +79,7 @@ export function PdfSigner() {
       // 1. Subir archivo a Storage
       const publicUrl = await uploadSignedPdf(blob, nombreUnico, user.id)
 
-      // 2. REGISTRAR EN LA TABLA "documentos" para que el Gerente lo pueda ver
+      // 2. Registrar en la tabla "documentos" para que el Gerente lo pueda ver
       await crearSolicitudFirma({
         nombreArchivo: pdfFile.name,
         urlParcial: publicUrl,
@@ -89,6 +89,11 @@ export function PdfSigner() {
       
       setSignedPdfUrl(publicUrl)
       alert('¡Documento firmado y enviado a revisión de Gerencia / SGSI!')
+
+      // Notificar al Dashboard para recargar listados
+      if (onSigned) {
+        onSigned()
+      }
 
     } catch (error) {
       console.error('Error al firmar PDF:', error)
