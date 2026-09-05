@@ -50,28 +50,36 @@ export function PdfSigner() {
       const pdfX = Math.max(10, coords.x)
       const pdfY = Math.max(10, height - coords.y - 30)
 
-     // Obtener fecha y hora actual en formato local
-    const fechaActual = new Date().toLocaleString('es-CL', {
+      // Obtener fecha y hora actual en formato local
+      const fechaActual = new Date().toLocaleString('es-CL', {
         dateStyle: 'short',
         timeStyle: 'medium'
-    })
+      })
 
-    // Construir bloque de texto con Firma, Correo, Cargo y Fecha
-    const signInfo = `Firmado por: ${signatureText} (${profile?.email || user?.email})\nCargo: ${profile?.perfil} ${profile?.subperfil_iso ? `[${profile.subperfil_iso}]` : ''}\nFecha: ${fechaActual}`
+      // Arreglo con cada renglón individual
+      const lineasTexto = [
+        `Firmado por: ${signatureText} (${profile?.email || user?.email})`,
+        `Cargo: ${profile?.perfil || ''} ${profile?.subperfil_iso ? `[${profile.subperfil_iso}]` : ''}`,
+        `Fecha: ${fechaActual}`
+      ]
 
-    // Estampar en el PDF con soporte para saltos de línea y tamaño ajustado
-    currentPage.drawText(signInfo, {
-        x: pdfX,
-        y: pdfY,
-        size: 8,
-        lineHeight: 10,
-        color: rgb(0, 0.3, 0.8),
-    })
+      // Estampar cada línea aplicando un desplazamiento vertical (offset)
+      lineasTexto.forEach((linea, index) => {
+        currentPage.drawText(linea, {
+          x: pdfX,
+          y: pdfY - (index * 11), // Baja 11 pixeles por cada línea
+          size: 8,
+          color: rgb(0, 0.3, 0.8),
+        })
+      })
 
       const pdfBytes = await pdfDoc.save()
       const blob = new Blob([pdfBytes], { type: 'application/pdf' })
 
-      const publicUrl = await uploadSignedPdf(blob, pdfFile.name, user.id)
+      // Nombre único agregando timestamp para evitar caché
+      const nombreUnico = `${Date.now()}_${pdfFile.name}`
+      const publicUrl = await uploadSignedPdf(blob, nombreUnico, user.id)
+      
       setSignedPdfUrl(publicUrl)
       alert('¡Documento firmado y guardado con éxito!')
 
