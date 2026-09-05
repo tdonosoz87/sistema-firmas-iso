@@ -48,7 +48,10 @@ export function PdfSigner() {
       const { height } = currentPage.getSize()
 
       const pdfX = Math.max(10, coords.x)
-      const pdfY = Math.max(10, height - coords.y - 30)
+        // Código anterior:
+        // const pdfY = Math.max(10, height - coords.y - 30)
+        // Nuevo cálculo con elevación ajustada:
+      const pdfY = Math.max(10, height - coords.y + 15)
 
       // Obtener fecha y hora actual en formato local
       const fechaActual = new Date().toLocaleString('es-CL', {
