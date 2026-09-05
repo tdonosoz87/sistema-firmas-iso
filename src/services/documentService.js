@@ -1,7 +1,7 @@
 import { supabase } from './supabaseClient'
 
-// Subir archivo a Supabase Storage
-export const uploadPdfToStorage = async (fileBlob, fileName, folder) => {
+// Función genérica para subir archivos a Supabase Storage
+export const uploadPdfToStorage = async (fileBlob, fileName, folder = 'firmas') => {
   const filePath = `${folder}/${Date.now()}_${fileName}`
   
   const { error } = await supabase.storage
@@ -20,8 +20,13 @@ export const uploadPdfToStorage = async (fileBlob, fileName, folder) => {
   return publicUrlData.publicUrl
 }
 
+// Mantener alias para compatibilidad con PdfSigner
+export const uploadSignedPdf = async (fileBlob, fileName, userId) => {
+  return await uploadPdfToStorage(fileBlob, fileName, userId)
+}
+
 // Crear nueva solicitud de firma (Firma 1)
-export const crearSolicitudFirma = async ({ nombreArchivo, urlParcial, creadorId, coordsFirma1, paginaFirma1 }) => {
+export const crearSolicitudFirma = async ({ nombreArchivo, urlParcial, creadorId, coordsFirma1 }) => {
   const { data, error } = await supabase
     .from('documentos')
     .insert([{
@@ -29,7 +34,7 @@ export const crearSolicitudFirma = async ({ nombreArchivo, urlParcial, creadorId
       url_pdf_parcial: urlParcial,
       creador_id: creadorId,
       estado: 'PENDIENTE_SEGUNDA_FIRMA',
-      firma_1_info: { coords: coordsFirma1, pagina: paginaFirma1 }
+      firma_1_info: { coords: coordsFirma1 }
     }])
     .select()
 
@@ -49,7 +54,7 @@ export const obtenerDocumentosPendientes = async () => {
   return data
 }
 
-// Finalizar segunda firma y aprobar (Firma 2 por Gerente / Encargado SGSI)
+// Finalizar segunda firma y aprobar (Firma 2)
 export const aprobarYFinalizarDocumento = async ({ documentoId, urlFinal, aprobadorId, coordsFirma2 }) => {
   const { data, error } = await supabase
     .from('documentos')
