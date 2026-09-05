@@ -50,14 +50,23 @@ export function PdfSigner() {
       const pdfX = Math.max(10, coords.x)
       const pdfY = Math.max(10, height - coords.y - 30)
 
-      const signInfo = `Firmado por: ${signatureText} | Cargo: ${profile?.perfil} ${profile?.subperfil_iso ? `(${profile.subperfil_iso})` : ''}`
+     // Obtener fecha y hora actual en formato local
+    const fechaActual = new Date().toLocaleString('es-CL', {
+        dateStyle: 'short',
+        timeStyle: 'medium'
+    })
 
-      currentPage.drawText(signInfo, {
+    // Construir bloque de texto con Firma, Correo, Cargo y Fecha
+    const signInfo = `Firmado por: ${signatureText} (${profile?.email || user?.email})\nCargo: ${profile?.perfil} ${profile?.subperfil_iso ? `[${profile.subperfil_iso}]` : ''}\nFecha: ${fechaActual}`
+
+    // Estampar en el PDF con soporte para saltos de línea y tamaño ajustado
+    currentPage.drawText(signInfo, {
         x: pdfX,
         y: pdfY,
-        size: 9,
+        size: 8,
+        lineHeight: 10,
         color: rgb(0, 0.3, 0.8),
-      })
+    })
 
       const pdfBytes = await pdfDoc.save()
       const blob = new Blob([pdfBytes], { type: 'application/pdf' })
