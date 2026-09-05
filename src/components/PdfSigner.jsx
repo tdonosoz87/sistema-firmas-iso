@@ -49,7 +49,7 @@ const handleSignAndSave = async () => {
 
       const pdfX = Math.max(10, coords.x)
       // Ajuste de altura para que el texto quede SOBRE la línea elegida
-      const pdfY = Math.max(10, height - coords.y + 10)
+      const pdfY = Math.max(10, height - coords.y + 5)
 
       const fechaActual = new Date().toLocaleString('es-CL', {
         dateStyle: 'short',
