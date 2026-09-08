@@ -6,13 +6,13 @@ import { useAuth } from '../context/AuthContext'
 
 import { Document, Page, pdfjs } from 'react-pdf'
 
-// Configuración recomendada para worker
-pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`
+// Configuración de worker mediante CDN estable
+pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`
 
 export function PdfSigner({ onSigned }) {
   const { user, profile } = useAuth()
   const [pdfFile, setPdfFile] = useState(null)
-  const [pdfUrl, setPdfUrl] = useState(null) // URL temporal en memoria
+  const [fileBuffer, setFileBuffer] = useState(null) // Buffer binario directo
   const [numPages, setNumPages] = useState(null)
   const [pageNumber, setPageNumber] = useState(1)
   const [loading, setLoading] = useState(false)
@@ -23,23 +23,17 @@ export function PdfSigner({ onSigned }) {
 
   const nombreFirmante = profile?.email || user?.email || 'Usuario Autenticado'
 
-  // Liberar memoria cuando el componente se desmonte o cambie el archivo
-  useEffect(() => {
-    return () => {
-      if (pdfUrl) URL.revokeObjectURL(pdfUrl)
-    }
-  }, [pdfUrl])
-
-  const handleFileChange = (e) => {
+  const handleFileChange = async (e) => {
     const file = e.target.files[0]
     if (file) {
-      if (pdfUrl) URL.revokeObjectURL(pdfUrl)
-      
       setPdfFile(file)
-      setPdfUrl(URL.createObjectURL(file)) // Crear objeto URL compatible
       setSignedPdfUrl('')
       setPageNumber(1)
       setCoords({ x: 20, y: 20 })
+
+      // Convertir el archivo a Uint8Array directamente para react-pdf
+      const arrayBuffer = await file.arrayBuffer()
+      setFileBuffer({ data: new Uint8Array(arrayBuffer) })
     }
   }
 
@@ -128,7 +122,7 @@ export function PdfSigner({ onSigned }) {
         </p>
       </div>
 
-      {pdfUrl && (
+      {fileBuffer && (
         <div>
           {numPages > 1 && (
             <div style={{ marginBottom: '10px', display: 'flex', gap: '10px', alignItems: 'center' }}>
@@ -171,9 +165,9 @@ export function PdfSigner({ onSigned }) {
             </Draggable>
 
             <Document 
-              file={pdfUrl} 
+              file={fileBuffer} 
               onLoadSuccess={({ numPages }) => setNumPages(numPages)}
-              loading={<p style={{ fontSize: '12px', padding: '10px' }}>Cargando PDF...</p>}
+              loading={<p style={{ fontSize: '12px', padding: '10px' }}>Cargando vista previa del PDF...</p>}
             >
               <Page pageNumber={pageNumber} renderTextLayer={false} renderAnnotationLayer={false} />
             </Document>
