@@ -21,11 +21,53 @@ export function AuditLogModule({ reloadKey }) {
     cargarAuditoria()
   }, [reloadKey])
 
+  // Función para exportar la tabla activa a CSV (compatible con Excel)
+  const exportarCSV = () => {
+    if (registros.length === 0) {
+      alert('No hay registros para exportar.')
+      return
+    }
+
+    // Encabezados del archivo
+    const headers = ['ID Documento', 'Nombre Archivo', 'Estado', 'Creador (Firma 1)', 'Fecha Firma 1', 'Aprobador (Firma 2)', 'Fecha Firma 2']
+
+    // Mapeo de filas
+    const rows = registros.map(doc => [
+      `"${doc.id}"`,
+      `"${doc.nombre_archivo}"`,
+      `"${doc.estado}"`,
+      `"${doc.email_creador_resuelto || ''}"`,
+      `"${doc.created_at ? new Date(doc.created_at).toLocaleString('es-CL') : ''}"`,
+      `"${doc.email_aprobador_resuelto || ''}"`,
+      `"${doc.firma_2_info?.fecha ? new Date(doc.firma_2_info.fecha).toLocaleString('es-CL') : ''}"`
+    ])
+
+    // Incluir BOM (\uFEFF) para garantizar la lectura correcta de tildes y caracteres especiales en Excel
+    const csvContent = '\uFEFF' + [headers.join(';'), ...rows.map(row => row.join(';'))].join('\n')
+    
+    // Crear enlace de descarga
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', `Auditoria_Firmas_ISO_${new Date().toISOString().slice(0, 10)}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
   return (
     <div style={{ marginTop: '30px', padding: '20px', border: '1px solid #6c757d', borderRadius: '8px', backgroundColor: '#f8f9fa' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
         <h3 style={{ color: '#343a40', margin: 0 }}>📊 Registro y Traza de Firmantes (Auditoría ISO)</h3>
-        <button onClick={cargarAuditoria} style={{ padding: '5px 10px', fontSize: '12px', cursor: 'pointer' }}>🔄 Actualizar Traza</button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button onClick={exportarCSV} style={{ padding: '6px 12px', fontSize: '12px', fontWeight: 'bold', backgroundColor: '#198754', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+            📥 Exportar CSV (Excel)
+          </button>
+          <button onClick={cargarAuditoria} style={{ padding: '6px 12px', fontSize: '12px', cursor: 'pointer' }}>
+            🔄 Actualizar Traza
+          </button>
+        </div>
       </div>
 
       {loading ? (
