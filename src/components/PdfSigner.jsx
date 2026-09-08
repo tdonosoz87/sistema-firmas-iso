@@ -1,57 +1,53 @@
 import { useState, useRef } from 'react'
+import { Document, Page, pdfjs } from 'react-pdf'
 import Draggable from 'react-draggable'
 import { PDFDocument, rgb } from 'pdf-lib'
-import { uploadSignedPdf, crearSolicitudFirma } from '../services/documentService'
+import { uploadPdfToStorage, crearSolicitudFirma } from '../services/documentService'
 import { useAuth } from '../context/AuthContext'
 
-import { Document, Page, pdfjs } from 'react-pdf'
-
-// Configuración moderna y robusta del worker
 pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`
 
 export function PdfSigner({ onSigned }) {
-  const { user, profile } = useAuth()
-  const [pdfFile, setPdfFile] = useState(null)
-  const [numPages, setNumPages] = useState(null)
+  const { user } = useAuth()
+  const [file, setFile] = useState(null)
+  const [numPages, setNumPages] = useState(1)
   const [pageNumber, setPageNumber] = useState(1)
   const [loading, setLoading] = useState(false)
-  const [signedPdfUrl, setSignedPdfUrl] = useState('')
-
-  const [coords, setCoords] = useState({ x: 20, y: 20 })
+  const [coords, setCoords] = useState({ x: 50, y: 50 })
   const nodeRef = useRef(null)
 
-  const nombreFirmante = profile?.email || user?.email || 'Usuario Autenticado'
-
   const handleFileChange = (e) => {
-    if (e.target.files[0]) {
-      setPdfFile(e.target.files[0])
-      setSignedPdfUrl('')
+    const selectedFile = e.target.files[0]
+    if (selectedFile && selectedFile.type === 'application/pdf') {
+      setFile(selectedFile)
       setPageNumber(1)
-      setCoords({ x: 20, y: 20 })
+    } else {
+      alert('Por favor selecciona un archivo PDF válido.')
     }
   }
 
-  const handleStop = (e, data) => {
-    setCoords({ x: data.x, y: data.y })
+  const onDocumentLoadSuccess = ({ numPages }) => {
+    setNumPages(numPages)
+    setPageNumber(1)
   }
 
-  const handleSignAndSave = async () => {
-    if (!pdfFile) {
-      alert('Por favor selecciona un archivo PDF.')
-      return
-    }
-
+  const handleSignAndUpload = async () => {
+    if (!file) return
     setLoading(true)
+
     try {
-      const fileArrayBuffer = await pdfFile.arrayBuffer()
+      const fileArrayBuffer = await file.arrayBuffer()
       const pdfDoc = await PDFDocument.load(fileArrayBuffer)
-
       const pages = pdfDoc.getPages()
-      const currentPage = pages[pageNumber - 1]
-      const { height } = currentPage.getSize()
 
+      // 1. Obtener la página donde se colocó la firma
+      const targetPageIndex = Math.max(0, Math.min(pageNumber - 1, pages.length - 1))
+      const currentPage = pages[targetPageIndex]
+      const { height: pdfHeight } = currentPage.getSize()
+
+      // 2. Coordenadas seguras
       const pdfX = Math.max(10, coords.x)
-      const pdfY = Math.max(10, height - coords.y + 5)
+      const pdfY = Math.max(10, pdfHeight - coords.y)
 
       const fechaActual = new Date().toLocaleString('es-CL', {
         dateStyle: 'short',
@@ -59,8 +55,8 @@ export function PdfSigner({ onSigned }) {
       })
 
       const lineasTexto = [
-        `Firmado por: ${nombreFirmante}`,
-        `Cargo: ${profile?.perfil || ''} ${profile?.subperfil_iso ? `[${profile.subperfil_iso}]` : ''}`,
+        `FIRMADO POR: ${user?.email}`,
+        `Rol: Analista / Creador`,
         `Fecha: ${fechaActual}`
       ]
 
@@ -69,111 +65,106 @@ export function PdfSigner({ onSigned }) {
           x: pdfX,
           y: pdfY - (index * 11),
           size: 8,
-          color: rgb(0, 0.3, 0.8),
+          color: rgb(0, 0.2, 0.8)
         })
       })
 
       const pdfBytes = await pdfDoc.save()
       const blob = new Blob([pdfBytes], { type: 'application/pdf' })
 
-      const nombreUnico = `${Date.now()}_${pdfFile.name}`
-      
-      // 1. Subir archivo a Storage
-      const publicUrl = await uploadSignedPdf(blob, nombreUnico, user.id)
+      // 3. Subir archivo parcial a Storage
+      const publicUrl = await uploadPdfToStorage(blob, `PARCIAL_${file.name}`, 'pendientes')
 
-      // 2. Registrar en la tabla "documentos" para que el Gerente lo pueda ver
+      // 4. Crear registro en base de datos
       await crearSolicitudFirma({
-        nombreArchivo: pdfFile.name,
+        nombreArchivo: file.name,
         urlParcial: publicUrl,
         creadorId: user.id,
-        coordsFirma1: coords,
+        coordsFirma1: { ...coords, pagina: pageNumber },
         emailCreador: user?.email
       })
-      
-      setSignedPdfUrl(publicUrl)
-      alert('¡Documento firmado y enviado a revisión de Gerencia / SGSI!')
 
-      // Notificar al Dashboard para recargar listados
+      alert('¡Documento firmado en 1ª instancia y enviado a aprobación!')
+      setFile(null)
+
       if (onSigned) {
         onSigned()
       }
-
     } catch (error) {
       console.error('Error al firmar PDF:', error)
-      alert('Error al procesar y guardar la firma.')
+      alert(`Ocurrió un error al procesar el archivo: ${error.message}`)
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div style={{ marginTop: '20px', padding: '20px', border: '1px solid #ddd', borderRadius: '8px', backgroundColor: '#fff' }}>
-      <h3>Módulo de Firma Digital Interactiva</h3>
+    <div style={{ marginTop: '20px', padding: '20px', border: '1px solid #ccc', borderRadius: '8px', backgroundColor: '#fff' }}>
+      <h3>✍️ Módulo de Firma Digital Interactiva (Creación)</h3>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '15px' }}>
-        <input type="file" accept="application/pdf" onChange={handleFileChange} />
-        <p style={{ fontSize: '13px', margin: 0, color: '#333' }}>
-          <strong>Firmante activo:</strong> {nombreFirmante} ({profile?.perfil})
-        </p>
-      </div>
+      <input type="file" accept="application/pdf" onChange={handleFileChange} />
 
-      {pdfFile && (
-        <div>
-          <p style={{ fontSize: '13px', color: '#666' }}>
-            🖱️ **Arrastra el recuadro azul** hacia el lugar exacto del PDF donde deseas colocar la primera firma:
+      {file && (
+        <div style={{ marginTop: '15px' }}>
+          {/* Navegador multipágina */}
+          {numPages > 1 && (
+            <div style={{ marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <button 
+                disabled={pageNumber <= 1} 
+                onClick={() => setPageNumber(prev => prev - 1)}
+                style={{ padding: '4px 8px', cursor: 'pointer' }}
+              >
+                ◀ Anterior
+              </button>
+              <span style={{ fontSize: '13px', fontWeight: 'bold' }}>
+                Página {pageNumber} de {numPages}
+              </span>
+              <button 
+                disabled={pageNumber >= numPages} 
+                onClick={() => setPageNumber(prev => prev + 1)}
+                style={{ padding: '4px 8px', cursor: 'pointer' }}
+              >
+                Siguiente ▶
+              </button>
+            </div>
+          )}
+
+          <p style={{ fontSize: '13px', color: '#333' }}>
+            🖱️ **Arrastra el sello azul** a la ubicación donde deseas colocar tu firma en la página {pageNumber}:
           </p>
 
-          <div 
-            style={{ 
-              position: 'relative', 
-              border: '2px dashed #bbb', 
-              display: 'inline-block',
-              backgroundColor: '#f5f5f5'
-            }}
-          >
-            <Draggable nodeRef={nodeRef} bounds="parent" onStop={handleStop} defaultPosition={{ x: 20, y: 20 }}>
+          <div style={{ position: 'relative', border: '2px dashed #007bff', display: 'inline-block', backgroundColor: '#f8f9fa' }}>
+            <Draggable nodeRef={nodeRef} bounds="parent" onStop={(e, data) => setCoords({ x: data.x, y: data.y })} defaultPosition={{ x: 50, y: 50 }}>
               <div 
                 ref={nodeRef}
                 style={{
                   position: 'absolute',
                   padding: '6px 10px',
-                  backgroundColor: '#0066cc',
+                  backgroundColor: '#007bff',
                   color: '#fff',
                   borderRadius: '4px',
                   fontSize: '11px',
                   cursor: 'grab',
                   zIndex: 999,
-                  boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
                   userSelect: 'none'
                 }}
               >
-                ✍️ {nombreFirmante}
+                📝 Firma: {user?.email}
               </div>
             </Draggable>
 
-            <Document 
-              file={pdfFile} 
-              onLoadSuccess={({ numPages }) => setNumPages(numPages)}
-            >
+            <Document file={file} onLoadSuccess={onDocumentLoadSuccess}>
               <Page pageNumber={pageNumber} renderTextLayer={false} renderAnnotationLayer={false} />
             </Document>
           </div>
 
-          {numPages > 1 && (
-            <div style={{ marginTop: '10px', display: 'flex', gap: '10px', alignItems: 'center' }}>
-              <button disabled={pageNumber <= 1} onClick={() => setPageNumber(p => p - 1)}>Anterior</button>
-              <span>Página {pageNumber} de {numPages}</span>
-              <button disabled={pageNumber >= numPages} onClick={() => setPageNumber(p => p + 1)}>Siguiente</button>
-            </div>
-          )}
-
           <button 
-            onClick={handleSignAndSave} 
+            onClick={handleSignAndUpload} 
             disabled={loading}
             style={{
               marginTop: '15px',
               padding: '10px 20px',
-              backgroundColor: '#28a745',
+              backgroundColor: '#007bff',
               color: '#fff',
               border: 'none',
               borderRadius: '5px',
@@ -182,17 +173,8 @@ export function PdfSigner({ onSigned }) {
               display: 'block'
             }}
           >
-            {loading ? 'Procesando y Guardando...' : 'Estampar Firma y Enviar a Validación'}
+            {loading ? 'Procesando y Guardando...' : 'Firmar y Enviar a Aprobación'}
           </button>
-        </div>
-      )}
-
-      {signedPdfUrl && (
-        <div style={{ marginTop: '15px' }}>
-          <p style={{ color: '#28a745', fontWeight: 'bold' }}>¡Documento guardado y enviado a la bandeja de pendientes!</p>
-          <a href={signedPdfUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#0066cc' }}>
-            📄 Abrir PDF Parcialmente Firmado
-          </a>
         </div>
       )}
     </div>
