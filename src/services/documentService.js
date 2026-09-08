@@ -54,21 +54,29 @@ export const obtenerDocumentosPendientes = async () => {
   return data
 }
 
-// Finalizar segunda firma y aprobar (Firma 2)
-export const aprobarYFinalizarDocumento = async ({ documentoId, urlFinal, aprobadorId, coordsFirma2 }) => {
+// Finalizar segunda firma, aprobar (Firma 2) y actualizar nombre si cambió
+export const aprobarYFinalizarDocumento = async ({ documentoId, urlFinal, aprobadorId, coordsFirma2, nuevoNombre }) => {
+  const updateData = {
+    url_pdf_final: urlFinal,
+    aprobador_id: aprobadorId,
+    estado: 'COMPLETADO',
+    firma_2_info: { coords: coordsFirma2, fecha: new Date().toISOString() }
+  }
+
+  // Si se proporcionó un nuevo nombre, lo actualizamos también
+  if (nuevoNombre && nuevoNombre.trim() !== '') {
+    updateData.nombre_archivo = nuevoNombre.trim()
+  }
+
   const { data, error } = await supabase
     .from('documentos')
-    .update({
-      url_pdf_final: urlFinal,
-      aprobador_id: aprobadorId,
-      estado: 'COMPLETADO',
-      firma_2_info: { coords: coordsFirma2, fecha: new Date().toISOString() }
-    })
+    .update(updateData)
     .eq('id', documentoId)
     .select()
 
   if (error) throw error
   return data[0]
+}
 }
 // Obtener todos los documentos completados con ambas firmas
 export const obtenerDocumentosCompletados = async () => {

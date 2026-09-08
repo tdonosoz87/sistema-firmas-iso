@@ -11,11 +11,11 @@ export function PendingApprovalList({ onApproved }) {
   const { user, profile } = useAuth()
   const [pendientes, setPendientes] = useState([])
   const [selectedDoc, setSelectedDoc] = useState(null)
+  const [customFileName, setCustomFileName] = useState('')
   const [loading, setLoading] = useState(false)
   const [coords, setCoords] = useState({ x: 200, y: 20 })
   const nodeRef = useRef(null)
 
-  // Validar si el usuario actual tiene permisos de aprobación
   const esAprobador = profile?.perfil === 'Gerente' || profile?.subperfil_iso === 'Encargado SGSI'
 
   const cargarPendientes = async () => {
@@ -34,6 +34,13 @@ export function PendingApprovalList({ onApproved }) {
   }, [profile])
 
   if (!esAprobador) return null
+
+  const handleSelectDoc = (docId) => {
+    const doc = pendientes.find(d => d.id === docId)
+    setSelectedDoc(doc || null)
+    // Inicializar el campo de texto con el nombre actual del documento
+    setCustomFileName(doc ? doc.nombre_archivo : '')
+  }
 
   const handleApprove = async () => {
     if (!selectedDoc) return
@@ -68,29 +75,34 @@ export function PendingApprovalList({ onApproved }) {
           x: pdfX,
           y: pdfY - (index * 11),
           size: 8,
-          color: rgb(0, 0.5, 0.2), // Color verde para indicar aprobación OK
+          color: rgb(0, 0.5, 0.2),
         })
       })
 
       const pdfBytes = await pdfDoc.save()
       const blob = new Blob([pdfBytes], { type: 'application/pdf' })
 
-      // 2. Subir documento finalizado
-      const publicUrl = await uploadPdfToStorage(blob, `FINAL_${selectedDoc.nombre_archivo}`, 'completados')
+      // Definir el nombre final del archivo (usando el ingresado o el original)
+      const nombreDefinitivo = customFileName.trim() || selectedDoc.nombre_archivo
+      const nombreConExtension = nombreDefinitivo.endsWith('.pdf') ? nombreDefinitivo : `${nombreDefinitivo}.pdf`
 
-      // 3. Actualizar estado en Base de Datos
+      // 2. Subir documento finalizado
+      const publicUrl = await uploadPdfToStorage(blob, `FINAL_${nombreConExtension}`, 'completados')
+
+      // 3. Actualizar estado y nombre en Base de Datos
       await aprobarYFinalizarDocumento({
         documentoId: selectedDoc.id,
         urlFinal: publicUrl,
         aprobadorId: user.id,
-        coordsFirma2: coords
+        coordsFirma2: coords,
+        nuevoNombre: nombreConExtension
       })
 
-      alert('¡Documento aprobado y firmado exitosamente!')
+      alert('¡Documento aprobado, renombrado y firmado exitosamente!')
       setSelectedDoc(null)
+      setCustomFileName('')
       await cargarPendientes()
 
-      // Notificar al Dashboard para recargar la lista de completados
       if (onApproved) {
         onApproved()
       }
@@ -113,10 +125,7 @@ export function PendingApprovalList({ onApproved }) {
           <label style={{ fontSize: '13px', fontWeight: 'bold' }}>Selecciona un documento para dar Visto Bueno (OK):</label>
           <select 
             value={selectedDoc?.id || ''}
-            onChange={(e) => {
-              const doc = pendientes.find(d => d.id === e.target.value)
-              setSelectedDoc(doc || null)
-            }}
+            onChange={(e) => handleSelectDoc(e.target.value)}
             style={{ width: '100%', padding: '8px', marginTop: '5px', marginBottom: '15px' }}
           >
             <option value="">-- Seleccionar Documento --</option>
@@ -129,6 +138,20 @@ export function PendingApprovalList({ onApproved }) {
 
           {selectedDoc && (
             <div>
+              {/* Campo para editar/renombrar el documento */}
+              <div style={{ marginBottom: '15px', backgroundColor: '#fff', padding: '10px', borderRadius: '5px', border: '1px solid #c3e6cb' }}>
+                <label style={{ fontSize: '13px', fontWeight: 'bold', display: 'block', marginBottom: '5px', color: '#155724' }}>
+                  ✏️ Nombre del documento final (puedes editarlo antes de aprobar):
+                </label>
+                <input 
+                  type="text" 
+                  value={customFileName}
+                  onChange={(e) => setCustomFileName(e.target.value)}
+                  placeholder="Ej: POL-SGSI-001_Politica_Seguridad.pdf"
+                  style={{ width: '97%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', fontSize: '13px' }}
+                />
+              </div>
+
               <p style={{ fontSize: '13px', color: '#333' }}>
                 🖱️ **Arrastra el sello verde de aprobación** a la posición de la segunda firma:
               </p>
