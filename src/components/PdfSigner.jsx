@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import Draggable from 'react-draggable'
 import { PDFDocument, rgb } from 'pdf-lib'
 import { uploadSignedPdf, crearSolicitudFirma } from '../services/documentService'
@@ -6,12 +6,13 @@ import { useAuth } from '../context/AuthContext'
 
 import { Document, Page, pdfjs } from 'react-pdf'
 
-// Configuración recomendada y robusta usando .mjs
+// Configuración recomendada para worker
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`
 
 export function PdfSigner({ onSigned }) {
   const { user, profile } = useAuth()
   const [pdfFile, setPdfFile] = useState(null)
+  const [pdfUrl, setPdfUrl] = useState(null) // URL temporal en memoria
   const [numPages, setNumPages] = useState(null)
   const [pageNumber, setPageNumber] = useState(1)
   const [loading, setLoading] = useState(false)
@@ -22,9 +23,20 @@ export function PdfSigner({ onSigned }) {
 
   const nombreFirmante = profile?.email || user?.email || 'Usuario Autenticado'
 
+  // Liberar memoria cuando el componente se desmonte o cambie el archivo
+  useEffect(() => {
+    return () => {
+      if (pdfUrl) URL.revokeObjectURL(pdfUrl)
+    }
+  }, [pdfUrl])
+
   const handleFileChange = (e) => {
-    if (e.target.files[0]) {
-      setPdfFile(e.target.files[0])
+    const file = e.target.files[0]
+    if (file) {
+      if (pdfUrl) URL.revokeObjectURL(pdfUrl)
+      
+      setPdfFile(file)
+      setPdfUrl(URL.createObjectURL(file)) // Crear objeto URL compatible
       setSignedPdfUrl('')
       setPageNumber(1)
       setCoords({ x: 20, y: 20 })
@@ -44,8 +56,6 @@ export function PdfSigner({ onSigned }) {
     setLoading(true)
     try {
       const fileArrayBuffer = await pdfFile.arrayBuffer()
-      
-      // Carga segura del PDF ignorando objetos corruptos o pesados
       const pdfDoc = await PDFDocument.load(fileArrayBuffer, { ignoreEncryption: true })
 
       const pages = pdfDoc.getPages()
@@ -118,7 +128,7 @@ export function PdfSigner({ onSigned }) {
         </p>
       </div>
 
-      {pdfFile && (
+      {pdfUrl && (
         <div>
           {numPages > 1 && (
             <div style={{ marginBottom: '10px', display: 'flex', gap: '10px', alignItems: 'center' }}>
@@ -161,10 +171,9 @@ export function PdfSigner({ onSigned }) {
             </Draggable>
 
             <Document 
-              file={pdfFile} 
+              file={pdfUrl} 
               onLoadSuccess={({ numPages }) => setNumPages(numPages)}
               loading={<p style={{ fontSize: '12px', padding: '10px' }}>Cargando PDF...</p>}
-              error={<p style={{ fontSize: '12px', color: 'red', padding: '10px' }}>Error al abrir el PDF. Verifica que no esté protegido con contraseña.</p>}
             >
               <Page pageNumber={pageNumber} renderTextLayer={false} renderAnnotationLayer={false} />
             </Document>
