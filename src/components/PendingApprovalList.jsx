@@ -6,9 +6,11 @@ import { useAuth } from '../context/AuthContext'
 
 import { Document, Page, pdfjs } from 'react-pdf'
 
-// Configuración recomendada y compatible con react-pdf v7/v8/v9
-pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`
-
+// Importación nativa de Vite (Carga el worker desde tu propia app, sin CDN)
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.min.mjs',
+  import.meta.url
+).toString()
 
 export function PendingApprovalList({ onApproved }) {
   const { user, profile } = useAuth()

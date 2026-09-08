@@ -6,8 +6,12 @@ import { useAuth } from '../context/AuthContext'
 
 import { Document, Page, pdfjs } from 'react-pdf'
 
-// Configuración de worker mediante CDN estable
-pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`
+// Importación nativa de Vite (Carga el worker desde tu propia app, sin CDN)
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.min.mjs',
+  import.meta.url
+).toString()
+
 
 export function PdfSigner({ onSigned }) {
   const { user, profile } = useAuth()
@@ -23,17 +27,15 @@ export function PdfSigner({ onSigned }) {
 
   const nombreFirmante = profile?.email || user?.email || 'Usuario Autenticado'
 
-  const handleFileChange = async (e) => {
+ const handleFileChange = (e) => {
     const file = e.target.files[0]
     if (file) {
       setPdfFile(file)
+      // Generar URL limpia de memoria
+      setFileBuffer(URL.createObjectURL(file))
       setSignedPdfUrl('')
       setPageNumber(1)
       setCoords({ x: 20, y: 20 })
-
-      // Convertir el archivo a Uint8Array directamente para react-pdf
-      const arrayBuffer = await file.arrayBuffer()
-      setFileBuffer({ data: new Uint8Array(arrayBuffer) })
     }
   }
 
