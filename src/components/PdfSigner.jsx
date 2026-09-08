@@ -6,8 +6,8 @@ import { useAuth } from '../context/AuthContext'
 
 import { Document, Page, pdfjs } from 'react-pdf'
 
-// Configuración recomendada y compatible con react-pdf v7/v8/v9
-pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`
+// Configuración recomendada y robusta usando .mjs
+pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`
 
 export function PdfSigner({ onSigned }) {
   const { user, profile } = useAuth()
@@ -44,7 +44,9 @@ export function PdfSigner({ onSigned }) {
     setLoading(true)
     try {
       const fileArrayBuffer = await pdfFile.arrayBuffer()
-      const pdfDoc = await PDFDocument.load(fileArrayBuffer)
+      
+      // Carga segura del PDF ignorando objetos corruptos o pesados
+      const pdfDoc = await PDFDocument.load(fileArrayBuffer, { ignoreEncryption: true })
 
       const pages = pdfDoc.getPages()
       const currentPage = pages[pageNumber - 1]
@@ -81,26 +83,25 @@ export function PdfSigner({ onSigned }) {
       // 1. Subir archivo a Storage
       const publicUrl = await uploadSignedPdf(blob, nombreUnico, user.id)
 
-      // 2. Registrar en la tabla "documentos" para que el Gerente lo pueda ver
+      // 2. Registrar en la tabla "documentos"
       await crearSolicitudFirma({
         nombreArchivo: pdfFile.name,
         urlParcial: publicUrl,
         creadorId: user.id,
-        coordsFirma1: coords,
+        coordsFirma1: { ...coords, pagina: pageNumber },
         emailCreador: user?.email
       })
       
       setSignedPdfUrl(publicUrl)
       alert('¡Documento firmado y enviado a revisión de Gerencia / SGSI!')
 
-      // Notificar al Dashboard para recargar listados
       if (onSigned) {
         onSigned()
       }
 
     } catch (error) {
       console.error('Error al firmar PDF:', error)
-      alert('Error al procesar y guardar la firma.')
+      alert(`Error al procesar y guardar la firma: ${error.message}`)
     } finally {
       setLoading(false)
     }
@@ -119,8 +120,16 @@ export function PdfSigner({ onSigned }) {
 
       {pdfFile && (
         <div>
+          {numPages > 1 && (
+            <div style={{ marginBottom: '10px', display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <button disabled={pageNumber <= 1} onClick={() => setPageNumber(p => p - 1)}>◀ Anterior</button>
+              <span style={{ fontSize: '13px', fontWeight: 'bold' }}>Página {pageNumber} de {numPages}</span>
+              <button disabled={pageNumber >= numPages} onClick={() => setPageNumber(p => p + 1)}>Siguiente ▶</button>
+            </div>
+          )}
+
           <p style={{ fontSize: '13px', color: '#666' }}>
-            🖱️ **Arrastra el recuadro azul** hacia el lugar exacto del PDF donde deseas colocar la primera firma:
+            🖱️ **Arrastra el recuadro azul** hacia el lugar exacto del PDF (Página {pageNumber}) donde deseas colocar la primera firma:
           </p>
 
           <div 
@@ -154,18 +163,12 @@ export function PdfSigner({ onSigned }) {
             <Document 
               file={pdfFile} 
               onLoadSuccess={({ numPages }) => setNumPages(numPages)}
+              loading={<p style={{ fontSize: '12px', padding: '10px' }}>Cargando PDF...</p>}
+              error={<p style={{ fontSize: '12px', color: 'red', padding: '10px' }}>Error al abrir el PDF. Verifica que no esté protegido con contraseña.</p>}
             >
               <Page pageNumber={pageNumber} renderTextLayer={false} renderAnnotationLayer={false} />
             </Document>
           </div>
-
-          {numPages > 1 && (
-            <div style={{ marginTop: '10px', display: 'flex', gap: '10px', alignItems: 'center' }}>
-              <button disabled={pageNumber <= 1} onClick={() => setPageNumber(p => p - 1)}>Anterior</button>
-              <span>Página {pageNumber} de {numPages}</span>
-              <button disabled={pageNumber >= numPages} onClick={() => setPageNumber(p => p + 1)}>Siguiente</button>
-            </div>
-          )}
 
           <button 
             onClick={handleSignAndSave} 
