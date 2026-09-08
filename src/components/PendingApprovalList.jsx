@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
-import { Document, Page, pdfjs } from 'react-pdf'
 import Draggable from 'react-draggable'
 import { PDFDocument, rgb } from 'pdf-lib'
 import { obtenerDocumentosPendientes, uploadPdfToStorage, aprobarYFinalizarDocumento } from '../services/documentService'
 import { useAuth } from '../context/AuthContext'
 
-pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`
+import { Document, Page, pdfjs } from 'react-pdf'
+// Configuración moderna y robusta del worker
+pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`
 
 export function PendingApprovalList({ onApproved }) {
   const { user, profile } = useAuth()
