@@ -100,22 +100,35 @@ export const eliminarDocumentoCompletado = async (documentoId) => {
   if (error) throw error
   return data
 }
-// Obtener la traza y registro detallado de firmantes
+
+// Obtener el registro y traza de auditoría sin depender de Foreign Keys rígidas
 export const obtenerRegistroAuditoria = async () => {
-  const { data, error } = await supabase
+  // 1. Obtener los documentos
+  const { data: documentos, error: errorDocs } = await supabase
     .from('documentos')
-    .select(`
-      id,
-      nombre_archivo,
-      estado,
-      created_at,
-      firma_1_info,
-      firma_2_info,
-      creador:profiles!creador_id(email, perfil, subperfil_iso),
-      aprobador:profiles!aprobador_id(email, perfil, subperfil_iso)
-    `)
+    .select('*')
     .order('created_at', { ascending: false })
 
-  if (error) throw error
-  return data
+  if (errorDocs) throw errorDocs
+  if (!documentos || documentos.length === 0) return []
+
+  // 2. Obtener los perfiles de usuarios para cruzar emails
+  const { data: perfiles, error: errorProf } = await supabase
+    .from('profiles')
+    .select('id, email, perfil, subperfil_iso')
+
+  if (errorProf) console.error('Error al obtener perfiles:', errorProf)
+
+  // Crear un mapa de perfiles para búsqueda rápida por ID
+  const perfilesMap = (perfiles || []).reduce((acc, p) => {
+    acc[p.id] = p
+    return acc
+  }, {})
+
+  // 3. Unir la información
+  return documentos.map(doc => ({
+    ...doc,
+    creador: perfilesMap[doc.creador_id] || null,
+    aprobador: perfilesMap[doc.aprobador_id] || null
+  }))
 }
