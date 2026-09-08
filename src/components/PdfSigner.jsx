@@ -6,12 +6,8 @@ import { useAuth } from '../context/AuthContext'
 
 import { Document, Page, pdfjs } from 'react-pdf'
 
-// Importación nativa local a través de Vite (sin depender de enlaces externos)
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.mjs',
-  import.meta.url
-).toString()
-
+// Configuración recomendada y compatible con react-pdf v7/v8/v9
+pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`
 
 export function PdfSigner({ onSigned }) {
   const { user, profile } = useAuth()
