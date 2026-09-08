@@ -1,14 +1,15 @@
 import { supabase } from './supabaseClient'
 
-// Función genérica para subir archivos a Supabase Storage
+// Función genérica para subir archivos a Supabase Storage con nombre limpio
 export const uploadPdfToStorage = async (fileBlob, fileName, folder = 'firmas') => {
-  const filePath = `${folder}/${Date.now()}_${fileName}`
+  // Guardar el archivo en la ruta del bucket usando el nombre limpio sin prefijos numéricos
+  const filePath = `${folder}/${fileName}`
   
   const { error } = await supabase.storage
     .from('documentos-firmados')
     .upload(filePath, fileBlob, {
       contentType: 'application/pdf',
-      upsert: true
+      upsert: true // Permite sobrescribir si ya existe una versión previa
     })
 
   if (error) throw error
@@ -63,7 +64,7 @@ export const aprobarYFinalizarDocumento = async ({ documentoId, urlFinal, aproba
     firma_2_info: { coords: coordsFirma2, fecha: new Date().toISOString() }
   }
 
-  // Si se proporcionó un nuevo nombre, lo actualizamos también
+  // Si se proporcionó un nuevo nombre, lo actualizamos en el registro de la base de datos
   if (nuevoNombre && nuevoNombre.trim() !== '') {
     updateData.nombre_archivo = nuevoNombre.trim()
   }

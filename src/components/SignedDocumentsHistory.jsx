@@ -59,18 +59,19 @@ export function SignedDocumentsHistory({ reloadKey }) {
       </div>
       <a 
         href={doc.url_pdf_final} 
+        download={doc.nombre_archivo} // Fuerza la descarga con el nombre limpio sin prefijos
         target="_blank" 
         rel="noopener noreferrer"
         style={{
-          padding: '8px 14px',
-          backgroundColor: '#0066cc',
-          color: '#fff',
-          borderRadius: '4px',
-          textDecoration: 'none',
-          fontSize: '12px',
-          fontWeight: 'bold'
-        }}
-      >
+            padding: '8px 14px',
+            backgroundColor: '#0066cc',
+            color: '#fff',
+            borderRadius: '4px',
+            textDecoration: 'none',
+            fontSize: '12px',
+            fontWeight: 'bold'
+              }}
+        >
         Abrir PDF Final ↗
       </a>
     </li>
