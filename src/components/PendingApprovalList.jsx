@@ -5,8 +5,13 @@ import { obtenerDocumentosPendientes, uploadPdfToStorage, aprobarYFinalizarDocum
 import { useAuth } from '../context/AuthContext'
 
 import { Document, Page, pdfjs } from 'react-pdf'
-// Configuración moderna y robusta del worker
-pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`
+
+// Importación nativa local a través de Vite (sin depender de enlaces externos)
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.min.mjs',
+  import.meta.url
+).toString()
+
 
 export function PendingApprovalList({ onApproved }) {
   const { user, profile } = useAuth()
