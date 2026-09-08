@@ -12,6 +12,10 @@ export function PendingApprovalList({ onApproved }) {
   const [pendientes, setPendientes] = useState([])
   const [selectedDoc, setSelectedDoc] = useState(null)
   
+  // Control de páginas multipágina
+  const [numPages, setNumPages] = useState(1)
+  const [pageNumber, setPageNumber] = useState(1)
+
   // Estado para controlar si se desea renombrar y el nuevo nombre
   const [quiereRenombrar, setQuiereRenombrar] = useState(false)
   const [customFileName, setCustomFileName] = useState('')
@@ -42,8 +46,14 @@ export function PendingApprovalList({ onApproved }) {
   const handleSelectDoc = (docId) => {
     const doc = pendientes.find(d => d.id === docId)
     setSelectedDoc(doc || null)
+    setPageNumber(1)
     setQuiereRenombrar(false)
     setCustomFileName(doc ? doc.nombre_archivo : '')
+  }
+
+  const onDocumentLoadSuccess = ({ numPages }) => {
+    setNumPages(numPages)
+    setPageNumber(1)
   }
 
   const handleApprove = async () => {
@@ -57,11 +67,15 @@ export function PendingApprovalList({ onApproved }) {
       const pdfDoc = await PDFDocument.load(fileArrayBuffer)
 
       const pages = pdfDoc.getPages()
-      const currentPage = pages[0]
-      const { height } = currentPage.getSize()
+      
+      // 2. Obtener la página seleccionada actualmente (en base 0)
+      const targetPageIndex = Math.max(0, Math.min(pageNumber - 1, pages.length - 1))
+      const currentPage = pages[targetPageIndex]
+      const { height: pdfHeight } = currentPage.getSize()
 
+      // 3. Ajuste y protección de coordenadas para evitar errores fuera de límites
       const pdfX = Math.max(10, coords.x)
-      const pdfY = Math.max(10, height - coords.y + 5)
+      const pdfY = Math.max(10, pdfHeight - coords.y)
 
       const fechaActual = new Date().toLocaleString('es-CL', {
         dateStyle: 'short',
@@ -94,15 +108,15 @@ export function PendingApprovalList({ onApproved }) {
 
       const nombreConExtension = nombreDefinitivo.endsWith('.pdf') ? nombreDefinitivo : `${nombreDefinitivo}.pdf`
 
-      // 2. Subir documento finalizado
+      // 4. Subir documento finalizado
       const publicUrl = await uploadPdfToStorage(blob, `FINAL_${nombreConExtension}`, 'completados')
 
-      // 3. Actualizar estado y nombre en Base de Datos
+      // 5. Actualizar estado y nombre en Base de Datos
       await aprobarYFinalizarDocumento({
         documentoId: selectedDoc.id,
         urlFinal: publicUrl,
         aprobadorId: user.id,
-        coordsFirma2: coords,
+        coordsFirma2: { ...coords, pagina: pageNumber },
         nuevoNombre: nombreConExtension,
         emailAprobador: profile?.email || user?.email
       })
@@ -118,7 +132,7 @@ export function PendingApprovalList({ onApproved }) {
       }
     } catch (error) {
       console.error('Error al aprobar documento:', error)
-      alert('Ocurrió un error al procesar la aprobación.')
+      alert(`Ocurrió un error al procesar la aprobación: ${error.message}`)
     } finally {
       setLoading(false)
     }
@@ -176,8 +190,31 @@ export function PendingApprovalList({ onApproved }) {
                 )}
               </div>
 
+              {/* Selector de Navegación de Páginas */}
+              {numPages > 1 && (
+                <div style={{ marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <button 
+                    disabled={pageNumber <= 1} 
+                    onClick={() => setPageNumber(prev => prev - 1)}
+                    style={{ padding: '4px 8px', cursor: 'pointer' }}
+                  >
+                    ◀ Anterior
+                  </button>
+                  <span style={{ fontSize: '13px', fontWeight: 'bold' }}>
+                    Página {pageNumber} de {numPages}
+                  </span>
+                  <button 
+                    disabled={pageNumber >= numPages} 
+                    onClick={() => setPageNumber(prev => prev + 1)}
+                    style={{ padding: '4px 8px', cursor: 'pointer' }}
+                  >
+                    Siguiente ▶
+                  </button>
+                </div>
+              )}
+
               <p style={{ fontSize: '13px', color: '#333' }}>
-                🖱️ **Arrastra el sello verde de aprobación** a la posición de la segunda firma:
+                🖱️ **Arrastra el sello verde de aprobación** a la posición deseada en la página {pageNumber}:
               </p>
 
               <div style={{ position: 'relative', border: '2px dashed #28a745', display: 'inline-block', backgroundColor: '#fff' }}>
@@ -200,8 +237,8 @@ export function PendingApprovalList({ onApproved }) {
                   </div>
                 </Draggable>
 
-                <Document file={selectedDoc.url_pdf_parcial}>
-                  <Page pageNumber={1} renderTextLayer={false} renderAnnotationLayer={false} />
+                <Document file={selectedDoc.url_pdf_parcial} onLoadSuccess={onDocumentLoadSuccess}>
+                  <Page pageNumber={pageNumber} renderTextLayer={false} renderAnnotationLayer={false} />
                 </Document>
               </div>
 
