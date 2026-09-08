@@ -90,3 +90,13 @@ export const obtenerDocumentosCompletados = async () => {
   if (error) throw error
   return data
 }
+// Eliminar un documento del historial por su ID
+export const eliminarDocumentoCompletado = async (documentoId) => {
+  const { data, error } = await supabase
+    .from('documentos')
+    .delete()
+    .eq('id', documentoId)
+
+  if (error) throw error
+  return data
+}

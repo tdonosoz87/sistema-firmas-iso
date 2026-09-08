@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { obtenerDocumentosCompletados } from '../services/documentService'
+import { obtenerDocumentosCompletados, eliminarDocumentoCompletado } from '../services/documentService'
 
 export function SignedDocumentsHistory({ reloadKey }) {
   const [completados, setCompletados] = useState([])
@@ -21,6 +21,20 @@ export function SignedDocumentsHistory({ reloadKey }) {
     cargarCompletados()
   }, [reloadKey])
 
+  const handleDelete = async (id, nombre) => {
+    const confirmar = window.confirm(`¿Estás seguro de que deseas eliminar "${nombre}" del historial?`)
+    if (!confirmar) return
+
+    try {
+      await eliminarDocumentoCompletado(id)
+      alert('Registro eliminado exitosamente.')
+      await cargarCompletados()
+    } catch (err) {
+      console.error('Error al eliminar registro:', err)
+      alert('Ocurrió un error al intentar eliminar el registro.')
+    }
+  }
+
   return (
     <div style={{ marginTop: '30px', padding: '20px', border: '1px solid #17a2b8', borderRadius: '8px', backgroundColor: '#f0faff' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -34,49 +48,65 @@ export function SignedDocumentsHistory({ reloadKey }) {
         <p style={{ fontSize: '13px', color: '#666', marginTop: '10px' }}>Aún no hay documentos finalizados con ambas firmas.</p>
       ) : (
         <ul style={{ listStyle: 'none', padding: 0, marginTop: '15px' }}>
-  {completados.map((doc) => (
-    <li 
-      key={doc.id} 
-      style={{
-        padding: '12px',
-        marginBottom: '10px',
-        backgroundColor: '#fff',
-        borderRadius: '6px',
-        border: '1px solid #bfe5ef',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center'
-      }}
-    >
-      <div>
-        <strong style={{ display: 'block', color: '#333', fontSize: '14px' }}>📄 {doc.nombre_archivo}</strong>
-        <span style={{ fontSize: '12px', color: '#666', display: 'block', marginTop: '2px' }}>
-          Creado el: {new Date(doc.created_at).toLocaleString('es-CL')}
-        </span>
-        <span style={{ fontSize: '12px', color: '#28a745', fontWeight: 'bold' }}>
-          ✅ Estado: Completado (2/2 Firmas)
-        </span>
-      </div>
-      <a 
-        href={doc.url_pdf_final} 
-        download={doc.nombre_archivo} // Fuerza la descarga con el nombre limpio sin prefijos
-        target="_blank" 
-        rel="noopener noreferrer"
-        style={{
-            padding: '8px 14px',
-            backgroundColor: '#0066cc',
-            color: '#fff',
-            borderRadius: '4px',
-            textDecoration: 'none',
-            fontSize: '12px',
-            fontWeight: 'bold'
+          {completados.map((doc) => (
+            <li 
+              key={doc.id} 
+              style={{
+                padding: '12px',
+                marginBottom: '10px',
+                backgroundColor: '#fff',
+                borderRadius: '6px',
+                border: '1px solid #bfe5ef',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
               }}
-        >
-        Abrir PDF Final ↗
-      </a>
-    </li>
-  ))}
-</ul>
+            >
+              <div>
+                <strong style={{ display: 'block', color: '#333', fontSize: '14px' }}>📄 {doc.nombre_archivo}</strong>
+                <span style={{ fontSize: '12px', color: '#666', display: 'block', marginTop: '2px' }}>
+                  Creado el: {new Date(doc.created_at).toLocaleString('es-CL')}
+                </span>
+                <span style={{ fontSize: '12px', color: '#28a745', fontWeight: 'bold' }}>
+                  ✅ Estado: Completado (2/2 Firmas)
+                </span>
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <a 
+                  href={doc.url_pdf_final} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  style={{
+                    padding: '8px 12px',
+                    backgroundColor: '#0066cc',
+                    color: '#fff',
+                    borderRadius: '4px',
+                    textDecoration: 'none',
+                    fontSize: '12px',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  Abrir PDF ↗
+                </a>
+                <button 
+                  onClick={() => handleDelete(doc.id, doc.nombre_archivo)}
+                  style={{
+                    padding: '8px 12px',
+                    backgroundColor: '#dc3545',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '4px',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer'
+                  }}
+                >
+                  🗑️ Eliminar
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   )
