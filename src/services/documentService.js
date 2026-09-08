@@ -1,11 +1,24 @@
 import { supabase } from './supabaseClient'
 
-// Función genérica para subir archivos a Supabase Storage con nombre limpio
+const BUCKET_NAME = 'documentos-firmados'
+
+// Sanitiza el nombre de archivo para evitar errores "Invalid key" en Supabase Storage / S3
+const sanitizarNombreArchivo = (str) => {
+  if (!str) return 'documento_sin_nombre.pdf'
+  return str
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9._-]/g, '_')
+    .replace(/_+/g, '_')
+}
+
+// Subir archivos a Supabase Storage con sanitización previa
 export const uploadPdfToStorage = async (fileBlob, fileName, folder = 'firmas') => {
-  const filePath = `${folder}/${fileName}`
+  const nombreLimpio = sanitizarNombreArchivo(fileName)
+  const filePath = `${folder}/${nombreLimpio}`
   
   const { error } = await supabase.storage
-    .from('documentos-firmados')
+    .from(BUCKET_NAME)
     .upload(filePath, fileBlob, {
       contentType: 'application/pdf',
       upsert: true
@@ -14,7 +27,7 @@ export const uploadPdfToStorage = async (fileBlob, fileName, folder = 'firmas') 
   if (error) throw error
 
   const { data: publicUrlData } = supabase.storage
-    .from('documentos-firmados')
+    .from(BUCKET_NAME)
     .getPublicUrl(filePath)
 
   return publicUrlData.publicUrl
@@ -22,10 +35,10 @@ export const uploadPdfToStorage = async (fileBlob, fileName, folder = 'firmas') 
 
 // Alias para compatibilidad
 export const uploadSignedPdf = async (fileBlob, fileName, userId) => {
-  return await uploadPdfToStorage(fileBlob, fileName, userId)
+  return uploadPdfToStorage(fileBlob, fileName, userId)
 }
 
-// Crear nueva solicitud de firma (Firma 1) guardando el correo del creador
+// Crear nueva solicitud de firma (Firma 1)
 export const crearSolicitudFirma = async ({ nombreArchivo, urlParcial, creadorId, coordsFirma1, emailCreador }) => {
   const { data, error } = await supabase
     .from('documentos')
@@ -41,9 +54,10 @@ export const crearSolicitudFirma = async ({ nombreArchivo, urlParcial, creadorId
       }
     }])
     .select()
+    .single()
 
   if (error) throw error
-  return data[0]
+  return data
 }
 
 // Obtener documentos pendientes de aprobación
@@ -55,10 +69,10 @@ export const obtenerDocumentosPendientes = async () => {
     .order('created_at', { ascending: false })
 
   if (error) throw error
-  return data
+  return data || []
 }
 
-// Finalizar segunda firma, aprobar (Firma 2) y guardar el correo del aprobador
+// Finalizar segunda firma, aprobar (Firma 2) y actualizar nombre si aplica
 export const aprobarYFinalizarDocumento = async ({ documentoId, urlFinal, aprobadorId, coordsFirma2, nuevoNombre, emailAprobador }) => {
   const updateData = {
     url_pdf_final: urlFinal,
@@ -71,7 +85,7 @@ export const aprobarYFinalizarDocumento = async ({ documentoId, urlFinal, aproba
     }
   }
 
-  if (nuevoNombre && nuevoNombre.trim() !== '') {
+  if (nuevoNombre?.trim()) {
     updateData.nombre_archivo = nuevoNombre.trim()
   }
 
@@ -80,9 +94,10 @@ export const aprobarYFinalizarDocumento = async ({ documentoId, urlFinal, aproba
     .update(updateData)
     .eq('id', documentoId)
     .select()
+    .single()
 
   if (error) throw error
-  return data[0]
+  return data
 }
 
 // Obtener todos los documentos completados
@@ -94,7 +109,7 @@ export const obtenerDocumentosCompletados = async () => {
     .order('created_at', { ascending: false })
 
   if (error) throw error
-  return data
+  return data || []
 }
 
 // Eliminar un documento por su ID
@@ -108,20 +123,19 @@ export const eliminarDocumentoCompletado = async (documentoId) => {
   return data
 }
 
-// Obtener registros de auditoría leyendo datos inmutables de firma
+// Obtener registros de auditoría resolviendo correos de forma inmutable
 export const obtenerRegistroAuditoria = async () => {
-  const { data: documentos, error: errorDocs } = await supabase
+  const { data: documentos, error } = await supabase
     .from('documentos')
     .select('*')
     .order('created_at', { ascending: false })
 
-  if (errorDocs) throw errorDocs
+  if (error) throw error
   if (!documentos) return []
 
   return documentos.map(doc => ({
     ...doc,
-    // Extrae el correo guardado en la firma, o una etiqueta de respaldo
-    email_creador_resuelto: doc.firma_1_info?.email || 'td@empresa.com', 
-    email_aprobador_resuelto: doc.firma_2_info?.email || 'td1@empresa.com'
+    email_creador_resuelto: doc.firma_1_info?.email || 'Sin correo registrado', 
+    email_aprobador_resuelto: doc.firma_2_info?.email || 'Sin correo registrado'
   }))
 }
