@@ -77,7 +77,7 @@ export const aprobarYFinalizarDocumento = async ({ documentoId, urlFinal, aproba
   if (error) throw error
   return data[0]
 }
-}
+
 // Obtener todos los documentos completados con ambas firmas
 export const obtenerDocumentosCompletados = async () => {
   const { data, error } = await supabase
