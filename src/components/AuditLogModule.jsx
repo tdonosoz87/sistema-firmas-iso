@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import { obtenerRegistroAuditoria } from '../services/documentService'
+import { useAuth } from '../context/AuthContext'
 
 export function AuditLogModule({ reloadKey }) {
+  const { user } = useAuth()
   const [registros, setRegistros] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -20,6 +22,15 @@ export function AuditLogModule({ reloadKey }) {
   useEffect(() => {
     cargarAuditoria()
   }, [reloadKey])
+
+  // Función para formatear el identificador a email comprensible
+  const resolverEmail = (perfilObj, idOriginal) => {
+    if (perfilObj?.email) return perfilObj.email
+    if (idOriginal === user?.id) return user?.email
+    // Si sigue siendo un UUID largo, mostramos un identificador limpio
+    if (idOriginal && idOriginal.includes('-')) return `Usuario (${idOriginal.slice(0, 8)})`
+    return idOriginal || 'Usuario Registrado'
+  }
 
   return (
     <div style={{ marginTop: '30px', padding: '20px', border: '1px solid #6c757d', borderRadius: '8px', backgroundColor: '#f8f9fa' }}>
@@ -44,9 +55,10 @@ export function AuditLogModule({ reloadKey }) {
           </thead>
           <tbody>
             {registros.map((doc) => {
-              // Obtener el email del aprobador o un texto representativo
-              const emailCreador = doc.creador?.email || doc.creador_id || 'Usuario no identificado'
-              const emailAprobador = doc.aprobador?.email || (doc.aprobador_id ? `ID: ${doc.aprobador_id.slice(0, 8)}...` : null)
+              const emailCreador = resolverEmail(doc.creador, doc.creador_id)
+              const emailAprobador = doc.firma_2_info?.fecha 
+                ? resolverEmail(doc.aprobador, doc.aprobador_id) 
+                : null
 
               return (
                 <tr key={doc.id} style={{ borderBottom: '1px solid #dee2e6' }}>
@@ -64,7 +76,7 @@ export function AuditLogModule({ reloadKey }) {
                   <td style={{ padding: '10px' }}>
                     {doc.firma_2_info?.fecha ? (
                       <>
-                        <div><strong>{emailAprobador || emailCreador}</strong></div>
+                        <div><strong>{emailAprobador}</strong></div>
                         <div style={{ fontSize: '11px', color: '#666' }}>
                           {new Date(doc.firma_2_info.fecha).toLocaleString('es-CL')}
                         </div>
