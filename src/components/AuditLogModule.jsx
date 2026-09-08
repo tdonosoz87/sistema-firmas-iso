@@ -43,42 +43,48 @@ export function AuditLogModule({ reloadKey }) {
             </tr>
           </thead>
           <tbody>
-            {registros.map((doc) => (
-              <tr key={doc.id} style={{ borderBottom: '1px solid #dee2e6' }}>
-                <td style={{ padding: '10px', fontWeight: 'bold' }}>📄 {doc.nombre_archivo}</td>
-                
-                {/* Registro Firma 1 */}
-                <td style={{ padding: '10px' }}>
-                  <div><strong>{doc.creador?.email || 'S/I'}</strong></div>
-                  <div style={{ fontSize: '11px', color: '#666' }}>
-                    {doc.created_at ? new Date(doc.created_at).toLocaleString('es-CL') : 'Sin fecha'}
-                  </div>
-                </td>
+            {registros.map((doc) => {
+              // Obtener el email del aprobador o un texto representativo
+              const emailCreador = doc.creador?.email || doc.creador_id || 'Usuario no identificado'
+              const emailAprobador = doc.aprobador?.email || (doc.aprobador_id ? `ID: ${doc.aprobador_id.slice(0, 8)}...` : null)
 
-                {/* Registro Firma 2 */}
-                <td style={{ padding: '10px' }}>
-                  {doc.firma_2_info?.fecha ? (
-                    <>
-                      <div><strong>{doc.aprobador?.email || 'Aprobado'}</strong></div>
-                      <div style={{ fontSize: '11px', color: '#666' }}>
-                        {new Date(doc.firma_2_info.fecha).toLocaleString('es-CL')}
-                      </div>
-                    </>
-                  ) : (
-                    <span style={{ color: '#856404', fontStyle: 'italic' }}>Pendiente de Aprobación</span>
-                  )}
-                </td>
+              return (
+                <tr key={doc.id} style={{ borderBottom: '1px solid #dee2e6' }}>
+                  <td style={{ padding: '10px', fontWeight: 'bold' }}>📄 {doc.nombre_archivo}</td>
+                  
+                  {/* Registro Firma 1 */}
+                  <td style={{ padding: '10px' }}>
+                    <div><strong>{emailCreador}</strong></div>
+                    <div style={{ fontSize: '11px', color: '#666' }}>
+                      {doc.created_at ? new Date(doc.created_at).toLocaleString('es-CL') : 'Sin fecha'}
+                    </div>
+                  </td>
 
-                {/* Estado */}
-                <td style={{ padding: '10px' }}>
-                  {doc.estado === 'COMPLETADO' ? (
-                    <span style={{ color: '#28a745', fontWeight: 'bold' }}>✅ Completado (2/2)</span>
-                  ) : (
-                    <span style={{ color: '#ffc107', fontWeight: 'bold' }}>⏳ En Proceso (1/2)</span>
-                  )}
-                </td>
-              </tr>
-            ))}
+                  {/* Registro Firma 2 */}
+                  <td style={{ padding: '10px' }}>
+                    {doc.firma_2_info?.fecha ? (
+                      <>
+                        <div><strong>{emailAprobador || emailCreador}</strong></div>
+                        <div style={{ fontSize: '11px', color: '#666' }}>
+                          {new Date(doc.firma_2_info.fecha).toLocaleString('es-CL')}
+                        </div>
+                      </>
+                    ) : (
+                      <span style={{ color: '#856404', fontStyle: 'italic' }}>Pendiente de Aprobación</span>
+                    )}
+                  </td>
+
+                  {/* Estado */}
+                  <td style={{ padding: '10px' }}>
+                    {doc.estado === 'COMPLETADO' ? (
+                      <span style={{ color: '#28a745', fontWeight: 'bold' }}>✅ Completado (2/2)</span>
+                    ) : (
+                      <span style={{ color: '#ffc107', fontWeight: 'bold' }}>⏳ En Proceso (1/2)</span>
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       )}
