@@ -103,7 +103,8 @@ export function PendingApprovalList({ onApproved }) {
         urlFinal: publicUrl,
         aprobadorId: user.id,
         coordsFirma2: coords,
-        nuevoNombre: nombreConExtension
+        nuevoNombre: nombreConExtension,
+        emailAprobador: profile?.email || user?.email
       })
 
       alert('¡Documento aprobado y firmado exitosamente!')

@@ -2,14 +2,13 @@ import { supabase } from './supabaseClient'
 
 // Función genérica para subir archivos a Supabase Storage con nombre limpio
 export const uploadPdfToStorage = async (fileBlob, fileName, folder = 'firmas') => {
-  // Guardar el archivo en la ruta del bucket usando el nombre limpio sin prefijos numéricos
   const filePath = `${folder}/${fileName}`
   
   const { error } = await supabase.storage
     .from('documentos-firmados')
     .upload(filePath, fileBlob, {
       contentType: 'application/pdf',
-      upsert: true // Permite sobrescribir si ya existe una versión previa
+      upsert: true
     })
 
   if (error) throw error
@@ -21,13 +20,13 @@ export const uploadPdfToStorage = async (fileBlob, fileName, folder = 'firmas') 
   return publicUrlData.publicUrl
 }
 
-// Mantener alias para compatibilidad con PdfSigner
+// Alias para compatibilidad
 export const uploadSignedPdf = async (fileBlob, fileName, userId) => {
   return await uploadPdfToStorage(fileBlob, fileName, userId)
 }
 
-// Crear nueva solicitud de firma (Firma 1)
-export const crearSolicitudFirma = async ({ nombreArchivo, urlParcial, creadorId, coordsFirma1 }) => {
+// Crear nueva solicitud de firma (Firma 1) guardando el correo del creador
+export const crearSolicitudFirma = async ({ nombreArchivo, urlParcial, creadorId, coordsFirma1, emailCreador }) => {
   const { data, error } = await supabase
     .from('documentos')
     .insert([{
@@ -35,7 +34,11 @@ export const crearSolicitudFirma = async ({ nombreArchivo, urlParcial, creadorId
       url_pdf_parcial: urlParcial,
       creador_id: creadorId,
       estado: 'PENDIENTE_SEGUNDA_FIRMA',
-      firma_1_info: { coords: coordsFirma1 }
+      firma_1_info: { 
+        coords: coordsFirma1, 
+        email: emailCreador,
+        fecha: new Date().toISOString()
+      }
     }])
     .select()
 
@@ -55,16 +58,19 @@ export const obtenerDocumentosPendientes = async () => {
   return data
 }
 
-// Finalizar segunda firma, aprobar (Firma 2) y actualizar nombre si cambió
-export const aprobarYFinalizarDocumento = async ({ documentoId, urlFinal, aprobadorId, coordsFirma2, nuevoNombre }) => {
+// Finalizar segunda firma, aprobar (Firma 2) y guardar el correo del aprobador
+export const aprobarYFinalizarDocumento = async ({ documentoId, urlFinal, aprobadorId, coordsFirma2, nuevoNombre, emailAprobador }) => {
   const updateData = {
     url_pdf_final: urlFinal,
     aprobador_id: aprobadorId,
     estado: 'COMPLETADO',
-    firma_2_info: { coords: coordsFirma2, fecha: new Date().toISOString() }
+    firma_2_info: { 
+      coords: coordsFirma2, 
+      fecha: new Date().toISOString(),
+      email: emailAprobador
+    }
   }
 
-  // Si se proporcionó un nuevo nombre, lo actualizamos en el registro de la base de datos
   if (nuevoNombre && nuevoNombre.trim() !== '') {
     updateData.nombre_archivo = nuevoNombre.trim()
   }
@@ -79,7 +85,7 @@ export const aprobarYFinalizarDocumento = async ({ documentoId, urlFinal, aproba
   return data[0]
 }
 
-// Obtener todos los documentos completados con ambas firmas
+// Obtener todos los documentos completados
 export const obtenerDocumentosCompletados = async () => {
   const { data, error } = await supabase
     .from('documentos')
@@ -90,7 +96,8 @@ export const obtenerDocumentosCompletados = async () => {
   if (error) throw error
   return data
 }
-// Eliminar un documento del historial por su ID
+
+// Eliminar un documento por su ID
 export const eliminarDocumentoCompletado = async (documentoId) => {
   const { data, error } = await supabase
     .from('documentos')
@@ -101,9 +108,8 @@ export const eliminarDocumentoCompletado = async (documentoId) => {
   return data
 }
 
-// Obtener el registro y traza de auditoría sin depender de Foreign Keys rígidas
+// Obtener registros de auditoría resolviendo correos desde la firma o perfiles
 export const obtenerRegistroAuditoria = async () => {
-  // 1. Obtener los documentos
   const { data: documentos, error: errorDocs } = await supabase
     .from('documentos')
     .select('*')
@@ -112,23 +118,19 @@ export const obtenerRegistroAuditoria = async () => {
   if (errorDocs) throw errorDocs
   if (!documentos || documentos.length === 0) return []
 
-  // 2. Obtener los perfiles de usuarios para cruzar emails
-  const { data: perfiles, error: errorProf } = await supabase
+  // Intentar consultar perfiles como respaldo
+  const { data: perfiles } = await supabase
     .from('profiles')
-    .select('id, email, perfil, subperfil_iso')
+    .select('id, email')
 
-  if (errorProf) console.error('Error al obtener perfiles:', errorProf)
-
-  // Crear un mapa de perfiles para búsqueda rápida por ID
   const perfilesMap = (perfiles || []).reduce((acc, p) => {
-    acc[p.id] = p
+    acc[p.id] = p.email
     return acc
   }, {})
 
-  // 3. Unir la información
   return documentos.map(doc => ({
     ...doc,
-    creador: perfilesMap[doc.creador_id] || null,
-    aprobador: perfilesMap[doc.aprobador_id] || null
+    email_creador_resuelto: doc.firma_1_info?.email || perfilesMap[doc.creador_id] || 'Usuario Creador',
+    email_aprobador_resuelto: doc.firma_2_info?.email || perfilesMap[doc.aprobador_id] || 'Usuario Aprobador'
   }))
 }
