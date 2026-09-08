@@ -100,3 +100,22 @@ export const eliminarDocumentoCompletado = async (documentoId) => {
   if (error) throw error
   return data
 }
+// Obtener la traza y registro detallado de firmantes
+export const obtenerRegistroAuditoria = async () => {
+  const { data, error } = await supabase
+    .from('documentos')
+    .select(`
+      id,
+      nombre_archivo,
+      estado,
+      created_at,
+      firma_1_info,
+      firma_2_info,
+      creador:profiles!creador_id(email, perfil, subperfil_iso),
+      aprobador:profiles!aprobador_id(email, perfil, subperfil_iso)
+    `)
+    .order('created_at', { ascending: false })
+
+  if (error) throw error
+  return data
+}
