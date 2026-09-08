@@ -84,7 +84,8 @@ export function PdfSigner({ onSigned }) {
         nombreArchivo: pdfFile.name,
         urlParcial: publicUrl,
         creadorId: user.id,
-        coordsFirma1: coords
+        coordsFirma1: coords,
+        emailCreador: user?.email
       })
       
       setSignedPdfUrl(publicUrl)

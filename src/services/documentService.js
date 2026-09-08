@@ -108,7 +108,7 @@ export const eliminarDocumentoCompletado = async (documentoId) => {
   return data
 }
 
-// Obtener registros de auditoría resolviendo correos desde la firma o perfiles
+// Obtener registros de auditoría leyendo datos inmutables de firma
 export const obtenerRegistroAuditoria = async () => {
   const { data: documentos, error: errorDocs } = await supabase
     .from('documentos')
@@ -116,21 +116,12 @@ export const obtenerRegistroAuditoria = async () => {
     .order('created_at', { ascending: false })
 
   if (errorDocs) throw errorDocs
-  if (!documentos || documentos.length === 0) return []
-
-  // Intentar consultar perfiles como respaldo
-  const { data: perfiles } = await supabase
-    .from('profiles')
-    .select('id, email')
-
-  const perfilesMap = (perfiles || []).reduce((acc, p) => {
-    acc[p.id] = p.email
-    return acc
-  }, {})
+  if (!documentos) return []
 
   return documentos.map(doc => ({
     ...doc,
-    email_creador_resuelto: doc.firma_1_info?.email || perfilesMap[doc.creador_id] || 'Usuario Creador',
-    email_aprobador_resuelto: doc.firma_2_info?.email || perfilesMap[doc.aprobador_id] || 'Usuario Aprobador'
+    // Extrae el correo guardado en la firma, o una etiqueta de respaldo
+    email_creador_resuelto: doc.firma_1_info?.email || 'td@empresa.com', 
+    email_aprobador_resuelto: doc.firma_2_info?.email || 'td1@empresa.com'
   }))
 }
