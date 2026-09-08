@@ -11,7 +11,11 @@ export function PendingApprovalList({ onApproved }) {
   const { user, profile } = useAuth()
   const [pendientes, setPendientes] = useState([])
   const [selectedDoc, setSelectedDoc] = useState(null)
+  
+  // Estado para controlar si se desea renombrar y el nuevo nombre
+  const [quiereRenombrar, setQuiereRenombrar] = useState(false)
   const [customFileName, setCustomFileName] = useState('')
+  
   const [loading, setLoading] = useState(false)
   const [coords, setCoords] = useState({ x: 200, y: 20 })
   const nodeRef = useRef(null)
@@ -38,7 +42,7 @@ export function PendingApprovalList({ onApproved }) {
   const handleSelectDoc = (docId) => {
     const doc = pendientes.find(d => d.id === docId)
     setSelectedDoc(doc || null)
-    // Inicializar el campo de texto con el nombre actual del documento
+    setQuiereRenombrar(false)
     setCustomFileName(doc ? doc.nombre_archivo : '')
   }
 
@@ -82,8 +86,12 @@ export function PendingApprovalList({ onApproved }) {
       const pdfBytes = await pdfDoc.save()
       const blob = new Blob([pdfBytes], { type: 'application/pdf' })
 
-      // Definir el nombre final del archivo (usando el ingresado o el original)
-      const nombreDefinitivo = customFileName.trim() || selectedDoc.nombre_archivo
+      // Definir el nombre final según la elección del usuario
+      let nombreDefinitivo = selectedDoc.nombre_archivo
+      if (quiereRenombrar && customFileName.trim() !== '') {
+        nombreDefinitivo = customFileName.trim()
+      }
+
       const nombreConExtension = nombreDefinitivo.endsWith('.pdf') ? nombreDefinitivo : `${nombreDefinitivo}.pdf`
 
       // 2. Subir documento finalizado
@@ -98,8 +106,9 @@ export function PendingApprovalList({ onApproved }) {
         nuevoNombre: nombreConExtension
       })
 
-      alert('¡Documento aprobado, renombrado y firmado exitosamente!')
+      alert('¡Documento aprobado y firmado exitosamente!')
       setSelectedDoc(null)
+      setQuiereRenombrar(false)
       setCustomFileName('')
       await cargarPendientes()
 
@@ -138,18 +147,32 @@ export function PendingApprovalList({ onApproved }) {
 
           {selectedDoc && (
             <div>
-              {/* Campo para editar/renombrar el documento */}
-              <div style={{ marginBottom: '15px', backgroundColor: '#fff', padding: '10px', borderRadius: '5px', border: '1px solid #c3e6cb' }}>
-                <label style={{ fontSize: '13px', fontWeight: 'bold', display: 'block', marginBottom: '5px', color: '#155724' }}>
-                  ✏️ Nombre del documento final (puedes editarlo antes de aprobar):
+              {/* Sección de decisión para renombrar */}
+              <div style={{ marginBottom: '15px', backgroundColor: '#fff', padding: '12px', borderRadius: '5px', border: '1px solid #c3e6cb' }}>
+                <p style={{ margin: '0 0 8px 0', fontSize: '13px', color: '#333' }}>
+                  <strong>Nombre de origen:</strong> <code>{selectedDoc.nombre_archivo}</code>
+                </p>
+
+                <label style={{ fontSize: '13px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', color: '#155724' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={quiereRenombrar}
+                    onChange={(e) => setQuiereRenombrar(e.target.checked)}
+                  />
+                  ✏️ ¿Deseas modificar el nombre de este archivo antes de finalizar?
                 </label>
-                <input 
-                  type="text" 
-                  value={customFileName}
-                  onChange={(e) => setCustomFileName(e.target.value)}
-                  placeholder="Ej: POL-SGSI-001_Politica_Seguridad.pdf"
-                  style={{ width: '97%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', fontSize: '13px' }}
-                />
+
+                {quiereRenombrar && (
+                  <div style={{ marginTop: '10px' }}>
+                    <input 
+                      type="text" 
+                      value={customFileName}
+                      onChange={(e) => setCustomFileName(e.target.value)}
+                      placeholder="Escribe el nuevo nombre del documento..."
+                      style={{ width: '97%', padding: '8px', borderRadius: '4px', border: '1px solid #28a745', fontSize: '13px' }}
+                    />
+                  </div>
+                )}
               </div>
 
               <p style={{ fontSize: '13px', color: '#333' }}>
