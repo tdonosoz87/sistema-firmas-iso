@@ -1,3 +1,8 @@
+Para incluir esta información en el README.md de forma clara y útil para otros desarrolladores o administradores de base de datos, agregamos una sección dedicada a la Gestión de Usuarios y Roles (profiles).
+
+Aquí tienes el bloque completo del README.md actualizado con el SQL de la tabla profiles, la explicación de su flexibilidad y el diagrama conceptual de la base de datos:
+
+Markdown
 # 📑 Sistema de Gestión Documental & Firma Digital (Cumplimiento ISO)
 
 Sistema de gestión documental, firma digital interactiva y trazabilidad de auditoría diseñado bajo los lineamientos de la norma **ISO 27001**. Ofrece una arquitectura de "cero almacenamiento costoso" al permitir la liberación de espacio en la nube reteniendo evidencia criptográfica e inmutable mediante **Hashes SHA-256**.
@@ -33,7 +38,7 @@ Sistema de gestión documental, firma digital interactiva y trazabilidad de audi
    git clone [https://github.com/tu-usuario/tu-repositorio.git](https://github.com/tu-usuario/tu-repositorio.git)
    cd tu-repositorio
 
-Instalar dependencias:
+   Instalar dependencias:
 
 Bash
 npm install
@@ -46,11 +51,41 @@ Iniciar en entorno de desarrollo:
 
 Bash
 npm run dev
-🗄️ Estructura de la Base de Datos (SQL Supabase)
-El sistema opera sobre una tabla principal llamada documentos y un Bucket de almacenamiento en Supabase Storage (documentos-firmados):
+🗄️ Esquema de Base de Datos (SQL Supabase)
+El sistema opera sobre dos tablas principales conectadas al módulo nativo de autenticación (auth.users) de Supabase:
+
+                  ┌─────────────────┐
+                  │   auth.users    │
+                  └────────┬────────┘
+                           │ (1:1)
+                           ▼
+                  ┌─────────────────┐
+                  │    profiles     │
+                  └─────────────────┘
+                           │
+                 (1:N)     │     (1:N)
+         ┌─────────────────┴─────────────────┐
+         ▼                                   ▼
+┌──────────────────┐               ┌──────────────────┐
+│ creador_id (Doc) │               │ aprobador_id(Doc)│
+└──────────────────┘               └──────────────────┘
+1. Tabla de Perfiles y Roles (profiles)
+Esta tabla extiende la información de auth.users para gestionar nombres, correos y roles dentro de la norma ISO (Analista, Gerente, Encargado SGSI).
+
+Nota de Implementación: La tabla profiles es completamente opcional/flexible. Quien implemente este proyecto puede adaptar los métodos de creación de usuarios (vía Triggers SQL, registros manuales o la API de Supabase) o conectar el sistema a otros proveedores de identidad (Firebase Auth, Auth0, Active Directory/LDAP), siempre que provea un UUID de usuario válido para registrar en los documentos.
 
 SQL
--- Crear tabla de documentos
+CREATE TABLE IF NOT EXISTS profiles (
+  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  email TEXT,
+  perfil TEXT DEFAULT 'Analista',
+  subperfil_iso TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+2. Tabla de Documentos (documentos)
+Sostiene el ciclo de vida del archivo, las coordenadas de las firmas y la evidencia del Hash SHA-256.
+
+SQL
 CREATE TABLE IF NOT EXISTS documentos (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   nombre_archivo TEXT NOT NULL,
@@ -65,10 +100,6 @@ CREATE TABLE IF NOT EXISTS documentos (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
-
--- Asegurar columna de Hash SHA-256
-ALTER TABLE documentos ADD COLUMN IF NOT EXISTS hash_documento TEXT;
-
 🔄 Guía de Migración / Cambio de Servidor o Backend
 Si en el futuro el proyecto se transfiere a otro servidor, servicio de Storage (como AWS S3) o a un entorno backend distinto:
 
@@ -86,5 +117,3 @@ Storage: Modifica únicamente las funciones uploadPdfToStorage y liberarAlmacena
 Base de Datos: Modifica las funciones crearSolicitudFirma, aprobarYFinalizarDocumento y obtenerRegistroAuditoria para apuntar a tus nuevos endpoints API REST.
 
 Componentes React: No requieren cambios en la interfaz ni en la lógica visual, ya que consumen de forma transparente las funciones expuestas por documentService.js.
-
--------------------------------------FIN DOCUMENTO----TOMAS DONOSO ZAMUDIO-----------------------------------------------------
