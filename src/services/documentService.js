@@ -89,7 +89,7 @@ export const aprobarYFinalizarDocumento = async ({
   const updateData = {
     url_pdf_final: urlFinal,
     aprobador_id: aprobadorId,
-    hash_documento_final: hashFinal, // Guardar Hash de la versión final
+    hash_documento: hashFinal, // Nombre exacto del campo en Supabase
     estado: 'COMPLETADO',
     firma_2_info: { 
       coords: coordsFirma2, 
