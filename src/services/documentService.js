@@ -42,7 +42,7 @@ export const uploadSignedPdf = async (fileBlob, fileName, userId) => {
   return uploadPdfToStorage(fileBlob, fileName, userId)
 }
 
-// Crear solicitud guardando Hash de origen
+// Crear solicitud guardando Hash de origen tanto en la columna principal como en el JSON de Firma 1
 export const crearSolicitudFirma = async ({ nombreArchivo, urlParcial, creadorId, coordsFirma1, emailCreador, hashDoc }) => {
   const { data, error } = await supabase
     .from('documentos')
@@ -55,7 +55,8 @@ export const crearSolicitudFirma = async ({ nombreArchivo, urlParcial, creadorId
       firma_1_info: { 
         coords: coordsFirma1, 
         email: emailCreador,
-        fecha: new Date().toISOString()
+        fecha: new Date().toISOString(),
+        hash_inicial: hashDoc
       }
     }])
     .select()
@@ -76,7 +77,7 @@ export const obtenerDocumentosPendientes = async () => {
   return data || []
 }
 
-// Aprobar y guardar el Hash final del PDF completado
+// Aprobar y actualizar el Hash al del PDF final firmado
 export const aprobarYFinalizarDocumento = async ({ 
   documentoId, 
   urlFinal, 
@@ -89,7 +90,7 @@ export const aprobarYFinalizarDocumento = async ({
   const updateData = {
     url_pdf_final: urlFinal,
     aprobador_id: aprobadorId,
-    hash_documento: hashFinal, // Nombre exacto del campo en Supabase
+    hash_documento: hashFinal,
     estado: 'COMPLETADO',
     firma_2_info: { 
       coords: coordsFirma2, 
@@ -124,7 +125,7 @@ export const obtenerDocumentosCompletados = async () => {
   return data || []
 }
 
-// Eliminar únicamente el archivo físico del Storage manteniendo el registro de auditoría
+// Eliminar únicamente los archivos del Storage manteniendo intacto el registro de auditoría en la DB
 export const liberarAlmacenamientoPDF = async (documentoId) => {
   const updateData = {
     url_pdf_final: null,
@@ -142,7 +143,7 @@ export const liberarAlmacenamientoPDF = async (documentoId) => {
   return data
 }
 
-// Eliminar registro por completo si se desea
+// Eliminar registro por completo si se requiere
 export const eliminarDocumentoCompletado = async (documentoId) => {
   const { data, error } = await supabase
     .from('documentos')

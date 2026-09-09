@@ -28,11 +28,12 @@ export function AuditLogModule({ reloadKey }) {
       return
     }
 
-    // Encabezados del archivo (Incluyendo Hash SHA-256)
+    // Encabezados del archivo con desglose de Hashes
     const headers = [
       'ID Documento', 
       'Nombre Archivo', 
-      'Hash SHA-256 (Huella Digital)', 
+      'Hash Inicial (Firma 1)', 
+      'Hash Final (Firma 2)', 
       'Estado', 
       'Creador (Firma 1)', 
       'Fecha Firma 1', 
@@ -44,7 +45,8 @@ export function AuditLogModule({ reloadKey }) {
     const rows = registros.map(doc => [
       `"${doc.id}"`,
       `"${doc.nombre_archivo}"`,
-      `"${doc.hash_documento || 'No generado'}"`,
+      `"${doc.firma_1_info?.hash_inicial || doc.hash_documento || 'Sin registro'}"`,
+      `"${doc.estado === 'COMPLETADO' ? doc.hash_documento || 'Sin registro' : 'En proceso'}"`,
       `"${doc.estado}"`,
       `"${doc.email_creador_resuelto || ''}"`,
       `"${doc.created_at ? new Date(doc.created_at).toLocaleString('es-CL') : ''}"`,
@@ -89,60 +91,75 @@ export function AuditLogModule({ reloadKey }) {
           <thead>
             <tr style={{ backgroundColor: '#e9ecef', textAlign: 'left', borderBottom: '2px solid #dee2e6' }}>
               <th style={{ padding: '10px' }}>Documento</th>
-              <th style={{ padding: '10px' }}>Huella Digital (Hash SHA-256)</th>
+              <th style={{ padding: '10px' }}>Huellas Digitales (Hashes SHA-256)</th>
               <th style={{ padding: '10px' }}>Firma 1 (Analista / Creador)</th>
               <th style={{ padding: '10px' }}>Firma 2 (VB Gerente / SGSI)</th>
               <th style={{ padding: '10px' }}>Estado</th>
             </tr>
           </thead>
           <tbody>
-            {registros.map((doc) => (
-              <tr key={doc.id} style={{ borderBottom: '1px solid #dee2e6' }}>
-                <td style={{ padding: '10px', fontWeight: 'bold' }}>📄 {doc.nombre_archivo}</td>
-                
-                {/* Visualización del Hash SHA-256 */}
-                <td style={{ padding: '10px', fontFamily: 'monospace', fontSize: '11px', color: '#28a745' }}>
-                  {doc.hash_documento ? (
-                    <span title={doc.hash_documento}>
-                      🔑 {doc.hash_documento.slice(0, 18)}...
-                    </span>
-                  ) : (
-                    <span style={{ color: '#6c757d', fontStyle: 'italic' }}>Sin Hash registrado</span>
-                  )}
-                </td>
+            {registros.map((doc) => {
+              const hashInicial = doc.firma_1_info?.hash_inicial || (doc.estado !== 'COMPLETADO' ? doc.hash_documento : null)
+              const hashFinal = doc.estado === 'COMPLETADO' ? doc.hash_documento : null
 
-                {/* Registro Firma 1 */}
-                <td style={{ padding: '10px' }}>
-                  <div><strong>{doc.email_creador_resuelto}</strong></div>
-                  <div style={{ fontSize: '11px', color: '#666' }}>
-                    {doc.created_at ? new Date(doc.created_at).toLocaleString('es-CL') : 'Sin fecha'}
-                  </div>
-                </td>
+              return (
+                <tr key={doc.id} style={{ borderBottom: '1px solid #dee2e6' }}>
+                  <td style={{ padding: '10px', fontWeight: 'bold' }}>📄 {doc.nombre_archivo}</td>
+                  
+                  {/* Visualización de Hashes de ambas etapas */}
+                  <td style={{ padding: '10px', fontFamily: 'monospace', fontSize: '11px' }}>
+                    <div>
+                      <span style={{ color: '#0066cc', fontWeight: 'bold' }}>H1 (Origen): </span>
+                      {hashInicial ? (
+                        <span title={hashInicial}>{hashInicial.slice(0, 12)}...</span>
+                      ) : (
+                        <span style={{ color: '#999', fontStyle: 'italic' }}>N/A</span>
+                      )}
+                    </div>
+                    
+                    <div style={{ marginTop: '3px' }}>
+                      <span style={{ color: '#28a745', fontWeight: 'bold' }}>H2 (Final): </span>
+                      {hashFinal ? (
+                        <span title={hashFinal}>{hashFinal.slice(0, 12)}...</span>
+                      ) : (
+                        <span style={{ color: '#856404', fontStyle: 'italic' }}>En proceso</span>
+                      )}
+                    </div>
+                  </td>
 
-                {/* Registro Firma 2 */}
-                <td style={{ padding: '10px' }}>
-                  {doc.firma_2_info?.fecha ? (
-                    <>
-                      <div><strong>{doc.email_aprobador_resuelto}</strong></div>
-                      <div style={{ fontSize: '11px', color: '#666' }}>
-                        {new Date(doc.firma_2_info.fecha).toLocaleString('es-CL')}
-                      </div>
-                    </>
-                  ) : (
-                    <span style={{ color: '#856404', fontStyle: 'italic' }}>Pendiente de Aprobación</span>
-                  )}
-                </td>
+                  {/* Registro Firma 1 */}
+                  <td style={{ padding: '10px' }}>
+                    <div><strong>{doc.email_creador_resuelto}</strong></div>
+                    <div style={{ fontSize: '11px', color: '#666' }}>
+                      {doc.created_at ? new Date(doc.created_at).toLocaleString('es-CL') : 'Sin fecha'}
+                    </div>
+                  </td>
 
-                {/* Estado */}
-                <td style={{ padding: '10px' }}>
-                  {doc.estado === 'COMPLETADO' ? (
-                    <span style={{ color: '#28a745', fontWeight: 'bold' }}>✅ Completado (2/2)</span>
-                  ) : (
-                    <span style={{ color: '#ffc107', fontWeight: 'bold' }}>⏳ En Proceso (1/2)</span>
-                  )}
-                </td>
-              </tr>
-            ))}
+                  {/* Registro Firma 2 */}
+                  <td style={{ padding: '10px' }}>
+                    {doc.firma_2_info?.fecha ? (
+                      <>
+                        <div><strong>{doc.email_aprobador_resuelto}</strong></div>
+                        <div style={{ fontSize: '11px', color: '#666' }}>
+                          {new Date(doc.firma_2_info.fecha).toLocaleString('es-CL')}
+                        </div>
+                      </>
+                    ) : (
+                      <span style={{ color: '#856404', fontStyle: 'italic' }}>Pendiente de Aprobación</span>
+                    )}
+                  </td>
+
+                  {/* Estado */}
+                  <td style={{ padding: '10px' }}>
+                    {doc.estado === 'COMPLETADO' ? (
+                      <span style={{ color: '#28a745', fontWeight: 'bold' }}>✅ Completado (2/2)</span>
+                    ) : (
+                      <span style={{ color: '#ffc107', fontWeight: 'bold' }}>⏳ En Proceso (1/2)</span>
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       )}
