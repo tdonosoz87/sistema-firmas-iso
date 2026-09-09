@@ -106,7 +106,7 @@ export function PendingApprovalList({ onApproved }) {
         currentPage.drawText(linea, {
           x: pdfX,
           y: pdfY - (index * 9.5), //se reduce tamaño para alineacion dentro de recuadro
-          size: 7, // Tamaño optimizado para incluir el hash de respaldo
+          size: 6.5, // Tamaño optimizado para incluir el hash de respaldo
           color: rgb(0, 0.5, 0.2),
         })
       })

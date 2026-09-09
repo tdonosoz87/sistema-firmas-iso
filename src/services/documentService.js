@@ -77,11 +77,19 @@ export const obtenerDocumentosPendientes = async () => {
 }
 
 // Aprobar y guardar el Hash final del PDF completado
-export const aprobarYFinalizarDocumento = async ({ documentoId, urlFinal, aprobadorId, coordsFirma2, nuevoNombre, emailAprobador, hashFinal }) => {
+export const aprobarYFinalizarDocumento = async ({ 
+  documentoId, 
+  urlFinal, 
+  aprobadorId, 
+  coordsFirma2, 
+  nuevoNombre, 
+  emailAprobador, 
+  hashFinal 
+}) => {
   const updateData = {
     url_pdf_final: urlFinal,
     aprobador_id: aprobadorId,
-    hash_documento: hashFinal,
+    hash_documento_final: hashFinal, // Guardar Hash de la versión final
     estado: 'COMPLETADO',
     firma_2_info: { 
       coords: coordsFirma2, 
