@@ -1,7 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
 import Draggable from 'react-draggable'
 import { PDFDocument, rgb } from 'pdf-lib'
-import { obtenerDocumentosPendientes, uploadPdfToStorage, aprobarYFinalizarDocumento } from '../services/documentService'
+import { 
+  obtenerDocumentosPendientes, 
+  uploadPdfToStorage, 
+  aprobarYFinalizarDocumento, 
+  calcularHashPDF 
+} from '../services/documentService'
 import { useAuth } from '../context/AuthContext'
 
 import { Document, Page, pdfjs } from 'react-pdf'
@@ -87,23 +92,31 @@ export function PendingApprovalList({ onApproved }) {
         timeStyle: 'medium'
       })
 
+      // Calcular Hash SHA-256 del documento original antes de estampar
+      const hashOriginal = await calcularHashPDF(fileArrayBuffer)
+
       const lineasTexto = [
         `VB / APROBADO: ${profile?.email || user?.email}`,
         `Cargo: ${profile?.perfil || ''} [${profile?.subperfil_iso || 'Aprobador'}]`,
-        `Fecha Aprobación: ${fechaActual}`
+        `Fecha Aprobación: ${fechaActual}`,
+        `Hash SHA-256: ${hashOriginal.slice(0, 16)}...` // Resumen del Hash impreso en la firma
       ]
 
       lineasTexto.forEach((linea, index) => {
         currentPage.drawText(linea, {
           x: pdfX,
           y: pdfY - (index * 11),
-          size: 8,
+          size: 7, // Tamaño optimizado para incluir el hash de respaldo
           color: rgb(0, 0.5, 0.2),
         })
       })
 
       const pdfBytes = await pdfDoc.save()
       const blob = new Blob([pdfBytes], { type: 'application/pdf' })
+
+      // Recalcular el Hash final inmutable del PDF completamente firmado
+      const finalArrayBuffer = await blob.arrayBuffer()
+      const hashFinalCompleto = await calcularHashPDF(finalArrayBuffer)
 
       // Definir el nombre final según la elección del usuario
       let nombreDefinitivo = selectedDoc.nombre_archivo
@@ -116,14 +129,15 @@ export function PendingApprovalList({ onApproved }) {
       // 4. Subir documento finalizado
       const publicUrl = await uploadPdfToStorage(blob, `FINAL_${nombreConExtension}`, 'completados')
 
-      // 5. Actualizar estado y nombre en Base de Datos
+      // 5. Actualizar estado, nombre y Hash SHA-256 en Base de Datos
       await aprobarYFinalizarDocumento({
         documentoId: selectedDoc.id,
         urlFinal: publicUrl,
         aprobadorId: user.id,
         coordsFirma2: { ...coords, pagina: pageNumber },
         nuevoNombre: nombreConExtension,
-        emailAprobador: profile?.email || user?.email
+        emailAprobador: profile?.email || user?.email,
+        hashFinal: hashFinalCompleto
       })
 
       alert('¡Documento aprobado y firmado exitosamente!')

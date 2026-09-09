@@ -28,13 +28,23 @@ export function AuditLogModule({ reloadKey }) {
       return
     }
 
-    // Encabezados del archivo
-    const headers = ['ID Documento', 'Nombre Archivo', 'Estado', 'Creador (Firma 1)', 'Fecha Firma 1', 'Aprobador (Firma 2)', 'Fecha Firma 2']
+    // Encabezados del archivo (Incluyendo Hash SHA-256)
+    const headers = [
+      'ID Documento', 
+      'Nombre Archivo', 
+      'Hash SHA-256 (Huella Digital)', 
+      'Estado', 
+      'Creador (Firma 1)', 
+      'Fecha Firma 1', 
+      'Aprobador (Firma 2)', 
+      'Fecha Firma 2'
+    ]
 
     // Mapeo de filas
     const rows = registros.map(doc => [
       `"${doc.id}"`,
       `"${doc.nombre_archivo}"`,
+      `"${doc.hash_documento || 'No generado'}"`,
       `"${doc.estado}"`,
       `"${doc.email_creador_resuelto || ''}"`,
       `"${doc.created_at ? new Date(doc.created_at).toLocaleString('es-CL') : ''}"`,
@@ -79,6 +89,7 @@ export function AuditLogModule({ reloadKey }) {
           <thead>
             <tr style={{ backgroundColor: '#e9ecef', textAlign: 'left', borderBottom: '2px solid #dee2e6' }}>
               <th style={{ padding: '10px' }}>Documento</th>
+              <th style={{ padding: '10px' }}>Huella Digital (Hash SHA-256)</th>
               <th style={{ padding: '10px' }}>Firma 1 (Analista / Creador)</th>
               <th style={{ padding: '10px' }}>Firma 2 (VB Gerente / SGSI)</th>
               <th style={{ padding: '10px' }}>Estado</th>
@@ -89,6 +100,17 @@ export function AuditLogModule({ reloadKey }) {
               <tr key={doc.id} style={{ borderBottom: '1px solid #dee2e6' }}>
                 <td style={{ padding: '10px', fontWeight: 'bold' }}>📄 {doc.nombre_archivo}</td>
                 
+                {/* Visualización del Hash SHA-256 */}
+                <td style={{ padding: '10px', fontFamily: 'monospace', fontSize: '11px', color: '#28a745' }}>
+                  {doc.hash_documento ? (
+                    <span title={doc.hash_documento}>
+                      🔑 {doc.hash_documento.slice(0, 18)}...
+                    </span>
+                  ) : (
+                    <span style={{ color: '#6c757d', fontStyle: 'italic' }}>Sin Hash registrado</span>
+                  )}
+                </td>
+
                 {/* Registro Firma 1 */}
                 <td style={{ padding: '10px' }}>
                   <div><strong>{doc.email_creador_resuelto}</strong></div>

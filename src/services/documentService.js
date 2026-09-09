@@ -2,7 +2,13 @@ import { supabase } from './supabaseClient'
 
 const BUCKET_NAME = 'documentos-firmados'
 
-// Sanitiza el nombre de archivo para evitar errores "Invalid key" en Supabase Storage / S3
+// Función nativa para calcular el Hash SHA-256 del PDF
+export const calcularHashPDF = async (arrayBuffer) => {
+  const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer)
+  const hashArray = Array.from(new Uint8Array(hashBuffer))
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
 const sanitizarNombreArchivo = (str) => {
   if (!str) return 'documento_sin_nombre.pdf'
   return str
@@ -12,7 +18,6 @@ const sanitizarNombreArchivo = (str) => {
     .replace(/_+/g, '_')
 }
 
-// Subir archivos a Supabase Storage con sanitización previa
 export const uploadPdfToStorage = async (fileBlob, fileName, folder = 'firmas') => {
   const nombreLimpio = sanitizarNombreArchivo(fileName)
   const filePath = `${folder}/${nombreLimpio}`
@@ -33,19 +38,19 @@ export const uploadPdfToStorage = async (fileBlob, fileName, folder = 'firmas') 
   return publicUrlData.publicUrl
 }
 
-// Alias para compatibilidad
 export const uploadSignedPdf = async (fileBlob, fileName, userId) => {
   return uploadPdfToStorage(fileBlob, fileName, userId)
 }
 
-// Crear nueva solicitud de firma (Firma 1)
-export const crearSolicitudFirma = async ({ nombreArchivo, urlParcial, creadorId, coordsFirma1, emailCreador }) => {
+// Crear solicitud guardando Hash de origen
+export const crearSolicitudFirma = async ({ nombreArchivo, urlParcial, creadorId, coordsFirma1, emailCreador, hashDoc }) => {
   const { data, error } = await supabase
     .from('documentos')
     .insert([{
       nombre_archivo: nombreArchivo,
       url_pdf_parcial: urlParcial,
       creador_id: creadorId,
+      hash_documento: hashDoc,
       estado: 'PENDIENTE_SEGUNDA_FIRMA',
       firma_1_info: { 
         coords: coordsFirma1, 
@@ -60,7 +65,6 @@ export const crearSolicitudFirma = async ({ nombreArchivo, urlParcial, creadorId
   return data
 }
 
-// Obtener documentos pendientes de aprobación
 export const obtenerDocumentosPendientes = async () => {
   const { data, error } = await supabase
     .from('documentos')
@@ -72,11 +76,12 @@ export const obtenerDocumentosPendientes = async () => {
   return data || []
 }
 
-// Finalizar segunda firma, aprobar (Firma 2) y actualizar nombre si aplica
-export const aprobarYFinalizarDocumento = async ({ documentoId, urlFinal, aprobadorId, coordsFirma2, nuevoNombre, emailAprobador }) => {
+// Aprobar y guardar el Hash final del PDF completado
+export const aprobarYFinalizarDocumento = async ({ documentoId, urlFinal, aprobadorId, coordsFirma2, nuevoNombre, emailAprobador, hashFinal }) => {
   const updateData = {
     url_pdf_final: urlFinal,
     aprobador_id: aprobadorId,
+    hash_documento: hashFinal,
     estado: 'COMPLETADO',
     firma_2_info: { 
       coords: coordsFirma2, 
@@ -100,7 +105,6 @@ export const aprobarYFinalizarDocumento = async ({ documentoId, urlFinal, aproba
   return data
 }
 
-// Obtener todos los documentos completados
 export const obtenerDocumentosCompletados = async () => {
   const { data, error } = await supabase
     .from('documentos')
@@ -112,7 +116,25 @@ export const obtenerDocumentosCompletados = async () => {
   return data || []
 }
 
-// Eliminar un documento por su ID
+// Eliminar únicamente el archivo físico del Storage manteniendo el registro de auditoría
+export const liberarAlmacenamientoPDF = async (documentoId) => {
+  const updateData = {
+    url_pdf_final: null,
+    url_pdf_parcial: null
+  }
+
+  const { data, error } = await supabase
+    .from('documentos')
+    .update(updateData)
+    .eq('id', documentoId)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+// Eliminar registro por completo si se desea
 export const eliminarDocumentoCompletado = async (documentoId) => {
   const { data, error } = await supabase
     .from('documentos')
@@ -123,7 +145,6 @@ export const eliminarDocumentoCompletado = async (documentoId) => {
   return data
 }
 
-// Obtener registros de auditoría resolviendo correos de forma inmutable
 export const obtenerRegistroAuditoria = async () => {
   const { data: documentos, error } = await supabase
     .from('documentos')

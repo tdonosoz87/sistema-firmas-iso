@@ -12,7 +12,6 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   import.meta.url
 ).toString()
 
-
 export function PdfSigner({ onSigned }) {
   const { user, profile } = useAuth()
   const [pdfFile, setPdfFile] = useState(null)
