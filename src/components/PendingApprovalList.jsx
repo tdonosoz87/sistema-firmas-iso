@@ -105,7 +105,7 @@ export function PendingApprovalList({ onApproved }) {
       lineasTexto.forEach((linea, index) => {
         currentPage.drawText(linea, {
           x: pdfX,
-          y: pdfY - (index * 11),
+          y: pdfY - (index * 9.5), //se reduce tamaño para alineacion dentro de recuadro
           size: 7, // Tamaño optimizado para incluir el hash de respaldo
           color: rgb(0, 0.5, 0.2),
         })

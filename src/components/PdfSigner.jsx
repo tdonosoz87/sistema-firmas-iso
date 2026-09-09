@@ -1,12 +1,16 @@
 import { useState, useRef, useEffect } from 'react'
 import Draggable from 'react-draggable'
 import { PDFDocument, rgb } from 'pdf-lib'
-import { uploadSignedPdf, crearSolicitudFirma } from '../services/documentService'
+import { 
+  uploadSignedPdf, 
+  crearSolicitudFirma, 
+  calcularHashPDF 
+} from '../services/documentService'
 import { useAuth } from '../context/AuthContext'
 
 import { Document, Page, pdfjs } from 'react-pdf'
 
-// Importación nativa de Vite (Carga el worker desde tu propia app, sin CDN)
+// Importación nativa de Vite
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.min.mjs',
   import.meta.url
@@ -15,7 +19,7 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
 export function PdfSigner({ onSigned }) {
   const { user, profile } = useAuth()
   const [pdfFile, setPdfFile] = useState(null)
-  const [fileBuffer, setFileBuffer] = useState(null) // Buffer binario directo
+  const [pdfUrl, setPdfUrl] = useState(null)
   const [numPages, setNumPages] = useState(null)
   const [pageNumber, setPageNumber] = useState(1)
   const [loading, setLoading] = useState(false)
@@ -26,12 +30,19 @@ export function PdfSigner({ onSigned }) {
 
   const nombreFirmante = profile?.email || user?.email || 'Usuario Autenticado'
 
- const handleFileChange = (e) => {
+  useEffect(() => {
+    return () => {
+      if (pdfUrl) URL.revokeObjectURL(pdfUrl)
+    }
+  }, [pdfUrl])
+
+  const handleFileChange = (e) => {
     const file = e.target.files[0]
     if (file) {
+      if (pdfUrl) URL.revokeObjectURL(pdfUrl)
+      
       setPdfFile(file)
-      // Generar URL limpia de memoria
-      setFileBuffer(URL.createObjectURL(file))
+      setPdfUrl(URL.createObjectURL(file))
       setSignedPdfUrl('')
       setPageNumber(1)
       setCoords({ x: 20, y: 20 })
@@ -51,6 +62,10 @@ export function PdfSigner({ onSigned }) {
     setLoading(true)
     try {
       const fileArrayBuffer = await pdfFile.arrayBuffer()
+      
+      // 1. Calcular Hash SHA-256 del documento original
+      const hashOriginal = await calcularHashPDF(fileArrayBuffer)
+
       const pdfDoc = await PDFDocument.load(fileArrayBuffer, { ignoreEncryption: true })
 
       const pages = pdfDoc.getPages()
@@ -65,17 +80,19 @@ export function PdfSigner({ onSigned }) {
         timeStyle: 'medium'
       })
 
+      // 2. Definir las líneas incluyendo el Hash SHA-256
       const lineasTexto = [
         `Firmado por: ${nombreFirmante}`,
         `Cargo: ${profile?.perfil || ''} ${profile?.subperfil_iso ? `[${profile.subperfil_iso}]` : ''}`,
-        `Fecha: ${fechaActual}`
+        `Fecha: ${fechaActual}`,
+        `Hash SHA-256: ${hashOriginal.slice(0, 16)}...`
       ]
 
       lineasTexto.forEach((linea, index) => {
         currentPage.drawText(linea, {
           x: pdfX,
-          y: pdfY - (index * 11),
-          size: 8,
+          y: pdfY - (index * 9.5), // Separación vertical optimizada
+          size: 7,                  // Tamaño ajustado para encajar en el recuadro
           color: rgb(0, 0.3, 0.8),
         })
       })
@@ -85,20 +102,21 @@ export function PdfSigner({ onSigned }) {
 
       const nombreUnico = `${Date.now()}_${pdfFile.name}`
       
-      // 1. Subir archivo a Storage
+      // 3. Subir archivo parcial a Storage
       const publicUrl = await uploadSignedPdf(blob, nombreUnico, user.id)
 
-      // 2. Registrar en la tabla "documentos"
+      // 4. Registrar en la base de datos guardando el Hash inicial
       await crearSolicitudFirma({
         nombreArchivo: pdfFile.name,
         urlParcial: publicUrl,
         creadorId: user.id,
         coordsFirma1: { ...coords, pagina: pageNumber },
-        emailCreador: user?.email
+        emailCreador: user?.email,
+        hashDoc: hashOriginal
       })
       
       setSignedPdfUrl(publicUrl)
-      alert('¡Documento firmado y enviado a revisión de Gerencia / SGSI!')
+      alert('¡Documento firmado en 1ª instancia y enviado a revisión!')
 
       if (onSigned) {
         onSigned()
@@ -123,7 +141,7 @@ export function PdfSigner({ onSigned }) {
         </p>
       </div>
 
-      {fileBuffer && (
+      {pdfUrl && (
         <div>
           {numPages > 1 && (
             <div style={{ marginBottom: '10px', display: 'flex', gap: '10px', alignItems: 'center' }}>
@@ -166,9 +184,9 @@ export function PdfSigner({ onSigned }) {
             </Draggable>
 
             <Document 
-              file={fileBuffer} 
+              file={pdfUrl} 
               onLoadSuccess={({ numPages }) => setNumPages(numPages)}
-              loading={<p style={{ fontSize: '12px', padding: '10px' }}>Cargando vista previa del PDF...</p>}
+              loading={<p style={{ fontSize: '12px', padding: '10px' }}>Cargando PDF...</p>}
             >
               <Page pageNumber={pageNumber} renderTextLayer={false} renderAnnotationLayer={false} />
             </Document>
